@@ -16,86 +16,73 @@ function [trajectory, grad, par] = load_trajectory(trajectory, dwellTime, gMax)
     k_furthest_start = max(abs([real(trajectory(:,1)); imag(trajectory(:,1))]));
 
     %time to ramp to furthest k space starting point.
-    %TODO: add slew rate ramping
+    %TODO: add slew rate for ramping
     max_time = k_furthest_start/(gyromagneticRatio*gMax);
 
-    %number of points during ramping (including zeroth position)
-    ramping_points = length(0:dwellTime:max_time);
 
     %add enough space in trajectory to accountn for ramping to first position
-    traj_size = size(trajectory);
-    gradientTraj = ones([traj_size(1), 1]);
+    gradientTraj = struct('G', cell(size(trajectory)), 'time', cell(size(trajectory)));
 
     %Calculate gradient trajectory
     for excite = 1:size(trajectory, 1)
-
-        %First k space position
-        first_k = trajectory(excite, 1);
-
-        %get ramping time needed for k space point
-        time_x = real(first_k)/(gyromagneticRatio*gMax);
-        time_y = imag(first_k)/(gyromagneticRatio*gMax);
-
-        %set the gradient strength for inital ramping
-        ramp_gradient = gMax;
-        if(time_x < 0)
-            %if time is negative the gradient should be negative to allow
-            %for positive time
-            ramp_gradient = -gMax;
-            time_x = -time_x;
-        end
-        %Create an array for the number of ramping points
-        ramping_x = repmat([ramp_gradient], [1, floor(time_x/dwellTime) + 1]);
-        
-        %Same but now for y axis
-        ramp_gradient = gMax;
-        if(time_y < 0)
-            ramp_gradient = -gMax;
-            time_y = -time_y;
-        end
-        ramping_y = repmat([ramp_gradient], [1, floor(time_y/dwellTime) + 1]);
-
-        %add remaining ramp points with zero so TE is the same for all aquasitions
-        ramping_x(end+1:ramping_points) = 0;
-        ramping_y(end+1:ramping_points) = 0;
-
-        %append ramping points to the first points of gradient trajectory
-        gradientTraj(excite,1:ramping_points) = ramping_x + 1i*ramping_y;
-        
-        counter = ramping_points+1;
+%         %First k space position
+%         first_k = trajectory(excite, 1);
+% 
+%         %get ramping time needed for k space point
+%         g_x = real(first_k)/(gyromagneticRatio*max_time);
+%         g_y = imag(first_k)/(gyromagneticRatio*max_time);
+%         G = g_x + 1i*g_y;
+%         
+%         gradient_struct.time = max_time;
+%         gradient_struct.G = G;
+% 
+%         %append ramping points to the first points of gradient trajectory
+%         gradientTraj(excite,1) = gradient_struct;   
         %Calculate remaining points with derivative
-        for k = 2:length(trajectory(excite,:))
+        past = 0;
+        for k = 1:length(trajectory(excite,:))
             %Get the difference between two k space points
-            k_diff = trajectory(excite, k) - trajectory(excite, k-1);
+            k_diff = trajectory(excite, k) - past;
             %Calculate the gradient from the difference (Numerical derrivative)
             gradient_diff = k_diff/(dwellTime * gyromagneticRatio);
 
             %If gradient is larger than gMax calculate how to get to same position with the contraints of gMax
             if(abs(real(gradient_diff)) > gMax)
-                return_points = abs(real(gradient_diff))/gMax;
-                new_grad = real(gradient_diff)/ceil(return_points);
-                grad_x = repmat([new_grad], [1, ceil(return_points)]);
+                time_x = abs(real(gradient_diff))*dwellTime/gMax;
+                if(real(gradient_diff) < 0)
+                    grad_x = -gMax;
+                else
+                    grad_x = gMax;
+                end
             else
+                time_x = dwellTime;
                 grad_x = real(gradient_diff);
             end
 
             %If gradient is larger than gMax calculate how to get to same position with the contraints of gMax
             if(abs(imag(gradient_diff)) > gMax)
-                return_points = abs(imag(gradient_diff))/gMax;
-                new_grad = imag(gradient_diff)/ceil(return_points);
-                grad_y = repmat([new_grad], [1, ceil(return_points)]);
+                time_y = abs(imag(gradient_diff))*dwellTime/gMax;
+                if(imag(gradient_diff) < 0)
+                    grad_y = -gMax;
+                else
+                    grad_y = gMax;
+                end
             else
+                time_y = dwellTime;
                 grad_y = imag(gradient_diff);
             end
 
-            %combine into x and y coordinates
-            grad_x(end+1:length(grad_y)) = 0;
-            grad_y(end+1:length(grad_x)) = 0;
-            grad_points = grad_x + 1i*grad_y;
+            if(time_x < time_y)
+                grad_x = time_x*grad_x/time_y;
+            elseif(time_y < time_x)
+                grad_y = time_y*grad_y/time_x;
+            end
             
-            gradientTraj(excite,counter:counter+length(grad_points)-1) = grad_points;
-            counter = counter + length(grad_points);
+            gradient_struct.time = max(time_x, time_y);
+            gradient_struct.G = grad_x + 1i*grad_y;
 
+            gradientTraj(excite, k) = gradient_struct;
+            past = trajectory(excite, k);
         end
     end
     grad = gradientTraj;
@@ -104,18 +91,18 @@ function [trajectory, grad, par] = load_trajectory(trajectory, dwellTime, gMax)
     spacial_points = [];
 
     %loop through each excitation
-    for excite = 1:size(trajectory, 2)
+    for excite = 1:size(trajectory, 1)
         %first point of the excitation
-        first = trajectory(1,excite);
+        first = trajectory(excite,1);
 
         %add first point to spacial points
         spacial_points(end+1) = first;
 
         %when trajectory(i,excite) == first we have made one cycle in k space.
         %stop looping when first is reached as remaning points are the same.
-        for i=2:length(trajectory(:,excite))
-            if (trajectory(i, excite) ~= first)
-                spacial_points(end+1) = trajectory(i, excite);
+        for i=2:length(trajectory(excite,:))
+            if (trajectory(excite, i) ~= first)
+                spacial_points(end+1) = trajectory(excite, i);
             else
                 break;
             end
