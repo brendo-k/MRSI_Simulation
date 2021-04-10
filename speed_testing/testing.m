@@ -105,10 +105,9 @@ for k=1:size(gradient,2)
     for x = 1:size(phantom, 1)
         for y = 1:size(phantom, 2)
             
-            times = (1i*freq_matrix(x,y)*cur_time);
-            H = expm(times*Iz);
+            times = (freq_matrix(x,y)*cur_time);
             
-            phantom(x,y).d = -1i*H*phantom(x,y).d*H;
+            phantom(x,y).d = expm(-1i*times*Iz)*phantom(x,y).d*expm(1i*times*Iz);
             S(cur_Kx, cur_Ky, x, y, spacial_index) = trace(trace_matrix * phantom(x,y).d);
             counter = counter + 1;
         end
