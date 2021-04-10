@@ -1,22 +1,21 @@
 
-function simulate_MRSI(k_traj, dwell_time, gMax)
+function [specs, S] = simulate_MRSI(k_traj, par, gMax)
     close all;
-    
 
     %TODO: Set up checmical shifts and coupling constants with sim_Hamiltonian
     dI=-3.0; %water chemical shift[ppm]
     
     %Calculate gradient, k space, and spatical parameters
-    [k_traj, gradient, scan_par] = load_trajectory(k_traj, dwell_time, gMax);
+    [k_traj, gradient, par] = load_trajectory(k_traj, par, gMax);
     
     %Other parameters;
     %np=64; %[spacial points]
     %tp=64; %[spectral points]
     
-    fovX = scan_par.fovX; %[m]
-    deltaX = fovX.delta_x; %[m]
-    fovY = scan_par.fovY;
-    deltaY = scan_par.delta_y;
+    fovX = par.fovX; %[m]
+    deltaX = par.delta_x; %[m]
+    fovY = par.fovY;
+    deltaY = par.delta_y;
     X = -fovX/2 + deltaX/2:deltaX:fovX/2 - deltaX/2;
     Y = -fovY/2 + deltaY/2:deltaY:fovY/2 - deltaY/2;
     
@@ -38,12 +37,6 @@ function simulate_MRSI(k_traj, dwell_time, gMax)
     %Now set up the equilibrium Density matrix:
     d0=Iz;
     
-    %Set up the hamiltonian operators:
-    H90=Iy*pi/2;
-    
-    %Excite spin density
-    dtemp=expm(-1i*H90)*d0*expm(1i*H90);                 %90 degree excitation
-    
     %phatom parameters
     phantom_nx = 64;
     phantom_ny = 64;
@@ -63,7 +56,7 @@ function simulate_MRSI(k_traj, dwell_time, gMax)
         for j = 1:length(phan_y)
             %Set coordinate
             phantom(i,j).x = phan_x(i);
-            phantom(i,j).y = phan_y(i);
+            phantom(i,j).y = phan_y(j);
 
             %water from 20 to 40, already excited
             if i >= 20 && i <= 44 && j >= 20 && j<=44 
@@ -76,41 +69,72 @@ function simulate_MRSI(k_traj, dwell_time, gMax)
             end
         end
     end
+
     
     %calculate k coordinates
     k_fov_x = par.k_fov_x;
     k_fov_y = par.k_fov_y;
     k_delta_x = par.k_delta_x;
     k_delta_y = par.k_delta_y;
-    Kx = -k_fov_x/2+k_delta_x/2:k_delta_x:k_fov_x/2-k_delta_x/2;
-    Ky = -k_fov_y/2+k_delta_y/2:k_delta_y:k_fov_y/2-k_delta_y/2;
+    Kx = par.k_min_x:k_delta_x:par.k_max_x;
+    Ky = par.k_min_y:k_delta_y:par.k_max_y;
     
     %aquire signal from readout
-    S = zeros(size(k_traj));
+    S = zeros(length(Kx), length(Ky), par.imageSize(3));
     
     %Now start readout:
     for excite=1:size(gradient,1)
-        
+        tic
+        %Reset phantom to transverse magnetization
+        phantom = MRSI_reset(phantom, d0);
+        %Excite phantom
+        phantom = MRSI_excite(phantom, 90);
+
         for k=1:size(gradient,2)
-            for i = 1:size(phantom,1)
-                for j = 1:size(phantom,2)
-                    %calculate the gradient at position x(j)
-                    cur_grad = gradient(excite,k).G;
-                    grad_x = real(cur_grad)*phantom(i,j).x;
-                    grad_y = imag(cur_grad)*phantom(i,j).y;
+            %Get current gradient and k space positions
+            cur_grad = gradient(excite,k).G;
+            cur_time = gradient(excite,k).time;
+            cur_k = k_traj(excite, k);
+
+            %Find k indecies for the readout point
+            cur_Kx = find((Kx==real(cur_k)),1);
+            cur_Ky = find((Ky==imag(cur_k)),1);
+
+            %Find the first index that is zero at Kx and Ky. This is where the singal 
+            %will be saved for thsi point
+            spacial_index = find(S(cur_Kx, cur_Ky, :));
+            phantom_time = tic;
+            for x = 1:size(phantom,1)
+                for y = 1:size(phantom,2)
+                    %Get the magentic field x and y coponents at position x and y 
+                    grad_x = real(cur_grad)*phantom(x,y).x;
+                    grad_y = imag(cur_grad)*phantom(x,y).y;
                     
+                    tic
                     %calculate the frequency at position x(j)
-                    freq_encode = phantom(j).dI*(B0+grad_x+grad_y)*gamma/1e6 + gamma*(B0+grad_x+grad_y) - gamma*B0;
+                    freq_encode = phantom(x,y).dI*(B0+grad_x+grad_y)*gamma/1e6 + gamma*(B0+grad_x+grad_y) - gamma*B0;
+                    freq_cal = toc;
                     
+                    tic
                     %hamiltonian and evolve
                     Hevol1=(freq_encode*2*pi)*Iz;
-                    phantom(j).d = expm(-1i*Hevol1*dwelltime)*phantom(j).d*expm(1i*Hevol1*dwelltime);
+                    phantom(x,y).d = expm(-1i*Hevol1*cur_time)*phantom(x,y).d*expm(1i*Hevol1*cur_time);
+                    Hamiltonian = toc;
                     
+                    tic
+                    signal = trace((Fx + 1i * Fy) * phantom(x,y).d);
+                    trace_t = toc;
+                    tic
                     %get signal
-                    S(excite,k) = S(n,k) + trace((Fx + 1i * Fy) * phantom(j).d);
+                    S(cur_Kx, cur_Ky,spacial_index) = S(cur_Kx, cur_Ky, spacial_index) + signal;
+                    readout = toc;
                 end
             end
+            t_phantom = toc(phantom_time);
+            %disp('time to calculate phantom: ' + string(t_phantom));
+            
         end
+        toc
     end
     
     %Never applied T2 weighting 
@@ -119,51 +143,33 @@ function simulate_MRSI(k_traj, dwell_time, gMax)
     %y = exp(-t/T2star);  %apply T2* weighting;
     %S = S.*y'
     
-    %plot the FID:
-    hold on;
-    for i = 1:size(S,2)
-        %plotting the fid of each k space acquisition
-        plot(t,S(:,i),'LineWidth',1);
-    end
-    xlabel('Time (s)','FontSize',20);
-    ylabel('FID signal intensity (a.u.)','FontSize',20);
-    title('Solution Figure for Part A','FontSize',24);
-    box off;
-    hold off;
-    set(gcf,'color','w');
+    specs=fftshift(fft(S,1),1);
+    specs=fftshift(fft(S,2),2);
+    specs=fftshift(fft(S,3),3);
     
-    %zero padding
-    %S= vertcat(S, zeros(64,1));
-    %Apply 2FFT to FID in order to get spectral and spacial dimensions
-    spec=fftshift(fft2(S));
-    
-    %Set up spacial frequency axis
-    f=[(-sw/2)+(dwelltime/2):1/((t(end)-t(1))+dwelltime):(sw/2)-(dwelltime/2)];
-    
-    %Set up spectral frequency axis (done the same way as spacial frequency)
-    f_spec=[(-sw_spectral/2)+(dt_spectral/2):1/((t_spectral(end)-t_spectral(1))+dt_spectral):(sw_spectral/2)-(dt_spectral/2)];
-    
-    %x coord calculated with Fov = 1/delta_k 
-    %                            = 1/(gamma*G*delta_t)
-    %                            = SW/(gamma*G)
-    x_coord=f/(gamma*gradient);
-    
-    %Convert frequency axis to ppm:
-    ppm=f_spec/(B0*gamma/1e6);
-    
-    
-    %Plot the spectrum:
-    figure;
-    if(size(spec, 2) == 1)
-        plot(x_coord, abs(spec))
-    else
-        surf(ppm, x_coord, abs(spec), 'LineWidth',1.2);
-    end
-    ylabel('x coordinates','FontSize',20);
-    xlabel('ppm', 'Fontsize', 20)
-    zlabel('Spectral Intensity (a.u.)','FontSize',20);
-    title('Solution Figure for Part B','FontSize',24);
-    box off;
-    set(gcf,'color','w');
+%     %Set up spectral frequency axis (done the same way as spacial frequency)
+%     f_spec= -par.sw/2:par.sw/(par.imageSize(3)-1):par.sw/2;
+%     
+%     %x coord calculated with Fov = 1/delta_k 
+%     %                            = 1/(gamma*G*delta_t)
+%     %                            = SW/(gamma*G)    
+%     %Convert frequency axis to ppm:
+%     ppm=f_spec/(B0*gamma/1e6);
+%     
+%     
+%     %Plot the spectrum:
+%     figure;
+%     if(size(spec, 2) == 1)
+%         plot(x_coord, abs(spec))
+%     else
+%         surf(ppm, x_coord, abs(spec(:,20,:)), 'LineWidth',1.2);
+%     end
+%     ylabel('x coordinates','FontSize',20);
+%     xlabel('ppm', 'Fontsize', 20)
+%     zlabel('Spectral Intensity (a.u.)','FontSize',20);
+%     title('Solution Figure for Part B','FontSize',24);
+%     box off;
+%     set(gcf,'color','w');
 
 end
+

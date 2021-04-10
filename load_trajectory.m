@@ -4,8 +4,9 @@
 %tradition MRSI's first dimension would be each excitation (in order) while the second is
 %the position during the readout of that excitation. Numbers are complex to
 %represent x and y positions
-function [trajectory, grad, par] = load_trajectory(trajectory, dwellTime, gMax) 
+function [trajectory, grad, par] = load_trajectory(trajectory, par, gMax) 
 
+    dwellTime = par.dwellTime;
     %convert to T/m
     gMax = gMax*10^-3;
 
@@ -25,20 +26,6 @@ function [trajectory, grad, par] = load_trajectory(trajectory, dwellTime, gMax)
 
     %Calculate gradient trajectory
     for excite = 1:size(trajectory, 1)
-%         %First k space position
-%         first_k = trajectory(excite, 1);
-% 
-%         %get ramping time needed for k space point
-%         g_x = real(first_k)/(gyromagneticRatio*max_time);
-%         g_y = imag(first_k)/(gyromagneticRatio*max_time);
-%         G = g_x + 1i*g_y;
-%         
-%         gradient_struct.time = max_time;
-%         gradient_struct.G = G;
-% 
-%         %append ramping points to the first points of gradient trajectory
-%         gradientTraj(excite,1) = gradient_struct;   
-        %Calculate remaining points with derivative
         past = 0;
         for k = 1:length(trajectory(excite,:))
             %Get the difference between two k space points
@@ -88,21 +75,24 @@ function [trajectory, grad, par] = load_trajectory(trajectory, dwellTime, gMax)
     grad = gradientTraj;
 
     %coordinates of the spacial points
-    spacial_points = [];
-
+    spacial_points = zeros(par.imageSize(1)*par.imageSize(2), 1);
+    
+    counter = 1;
     %loop through each excitation
     for excite = 1:size(trajectory, 1)
         %first point of the excitation
         first = trajectory(excite,1);
 
         %add first point to spacial points
-        spacial_points(end+1) = first;
+        spacial_points(counter) = first;
+        counter = counter + 1;
 
         %when trajectory(i,excite) == first we have made one cycle in k space.
         %stop looping when first is reached as remaning points are the same.
         for i=2:length(trajectory(excite,:))
             if (trajectory(excite, i) ~= first)
-                spacial_points(end+1) = trajectory(excite, i);
+                spacial_points(counter) = trajectory(excite, i);
+                counter = counter + 1;
             else
                 break;
             end
@@ -144,8 +134,8 @@ function [trajectory, grad, par] = load_trajectory(trajectory, dwellTime, gMax)
     k_fov_y = k_max_y - k_min_y;
 
     %calculate delta k 
-    k_delta_x = k_fov_x/k_nx;
-    k_delta_y = k_fov_y/k_ny;
+    k_delta_x = k_fov_x/(k_nx-1);
+    k_delta_y = k_fov_y/(k_ny-1);
     
     %calculate fov
     fovX = 1/k_delta_x;
@@ -170,4 +160,5 @@ function [trajectory, grad, par] = load_trajectory(trajectory, dwellTime, gMax)
     par.fovY = fovY;
     par.delta_x = delta_x;
     par.delta_y = delta_y;
+        
 end
