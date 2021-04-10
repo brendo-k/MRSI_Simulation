@@ -59,6 +59,7 @@ grad_t = zeros(size(gradient,2),1);
 find_t = zeros(size(gradient,2),1);
 indexing_t = zeros(size(gradient,2), 1);
 itter_t = zeros(size(gradient,2), 1);
+phantom_t = zeros(size(gradient,2), 1);
 H_t = zeros(size(gradient,2)*64*64,1);
 sand_t = zeros(size(gradient,2)*64*64, 1);
 quer_t = zeros(size(gradient,2)*64*64, 1);
@@ -97,31 +98,22 @@ for k=1:size(gradient,2)
     grad_matrix = real(cur_grad)*grad_pos_x + imag(cur_grad)*grad_pos_y + B0;
     freq_matrix = gamma*(di_matrix.*grad_matrix/1e6 + grad_matrix - B0)*2*pi;
     
-    freq_map = containers.Map('KeyType','double','ValueType','any');
+    %freq_map = containers.Map('KeyType','double','ValueType','any');
+    
+    tic
 
     for x = 1:size(phantom, 1)
         for y = 1:size(phantom, 2)
             
+            times = (1i*freq_matrix(x,y)*cur_time);
+            H = expm(times*Iz);
             
-            if isKey(freq_map, freq_matrix(x,y))
-                tic
-                H = freq_map(freq_matrix(x,y));
-                quer_t(counter) = toc;
-            else
-                tic
-                times = (1i*freq_matrix(x,y)*cur_time);
-                H = expm(times*Iz);
-                freq_map(freq_matrix(x,y)) = H;
-                H_t(counter) = toc;
-            end
-            
-            temp= -1i*H*phantom(x,y).d*H;
-
-            phantom(x,y).d = temp;
-            S(cur_Kx, cur_Ky, x, y, spacial_index) = trace(trace_matrix * temp);
+            phantom(x,y).d = -1i*H*phantom(x,y).d*H;
+            S(cur_Kx, cur_Ky, x, y, spacial_index) = trace(trace_matrix * phantom(x,y).d);
             counter = counter + 1;
         end
     end
+    phantom_t(k) = toc;
     
     index_matrix(cur_Kx, cur_Ky) = index_matrix(cur_Kx, cur_Ky) + 1;
     itter_t(k) = toc(itteration_tic);
@@ -134,6 +126,7 @@ total_time = toc(start)
 fprintf('grad %d\n', mean(grad_t))
 fprintf('find %d\n', mean(find_t))
 fprintf('indexing %d\n', mean(indexing_t))
+fprintf('phantom %d\n', mean(phantom_t))
 fprintf('itteration %d\n', mean(itter_t))
 fprintf('Hamil %d\n', mean(nonzeros(H_t)))
 fprintf('query %d\n', mean(nonzeros(quer_t)))

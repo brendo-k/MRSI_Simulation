@@ -84,7 +84,7 @@ function [specs, S] = simulate_MRSI(k_traj, par, gMax)
     
     %Now start readout:
     for excite=1:size(gradient,1)
-        tic
+        excite_tic = tic
         %Reset phantom to transverse magnetization
         phantom = MRSI_reset(phantom, d0);
         %Excite phantom
@@ -124,6 +124,7 @@ function [specs, S] = simulate_MRSI(k_traj, par, gMax)
                     tic
                     signal = trace((Fx + 1i * Fy) * phantom(x,y).d);
                     trace_t = toc;
+
                     tic
                     %get signal
                     S(cur_Kx, cur_Ky,spacial_index) = S(cur_Kx, cur_Ky, spacial_index) + signal;
@@ -134,7 +135,7 @@ function [specs, S] = simulate_MRSI(k_traj, par, gMax)
             %disp('time to calculate phantom: ' + string(t_phantom));
             
         end
-        toc
+        toc(excite_tic)
     end
     
     %Never applied T2 weighting 
