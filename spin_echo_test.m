@@ -3,7 +3,7 @@
 % Traj: trajectory class 
 % gMax: Maximum gradient strength in mT/m
 % B0: B0 magnetic field in T
-function [out] = simulate_MRSI(traj, gMax, B0)
+function [out] = spin_echo_test(traj, gMax, B0)
 
 tic
 if ~exist('B0', 'var')
@@ -19,6 +19,9 @@ Iy=(1i/2)*[0 -1;1 0];
 Iz=complex((1/2)*[1 0;0 -1]);
 Fx = Ix;
 Fy = Iy;
+
+%Now set up the equilibrium Density matrix:
+d0=Iz;
 
 %Calculate gradient, k space, and spatical parameters
 [gradient]  = load_trajectory(traj, gMax);
@@ -41,41 +44,57 @@ trace_matrix = (Fx + 1i * Fy);
 di_matrix = [phantom.dI];
 di_matrix = reshape(di_matrix, [size(phantom, 1), size(phantom, 2)]);
 
+k_first = traj.K_coordinates.k{1};
+k_second = traj.K_coordinates.k{2};
+
 %Initalize array for signal readout
-S = zeros(size(traj.k_trajectory, 1), size(traj.k_trajectory,2));
+S = zeros(length(k_first), length(k_second), size(phantom, 1), ... 
+    size(phantom, 2), traj.imageSize(3));
 
 S = complex(S, 0);
 
-readout_length = size(gradient, 2);
-x_phantom_size = size(phantom, 1);
-y_phantom_size = size(phantom, 2);
+k_traj = traj.k_trajectory;
+evol_time = 100e-4;
+
 %Now start readout:
-phantom = MRSI_excite(phantom, 90, Fy, I0);
-phantom = MRSI_evolve(phantom, 1e-3, 3, Ix);
-phantom = MRSI_excite(phantom, 180, Fy, I0);
-parfor excite=1:size(gradient,1)
+for excite=1:size(gradient,1)
     fprintf("simulating excitation number %d\n", excite)
     
+    %Reset phantom to transverse magnetization
+    phantom = MRSI_reset(phantom, d0, I0);
     %Excite phantom
-    new_phantom = phantom;
-    
-    for k=1:readout_length
+    phantom = MRSI_excite(phantom, 90, Fy, I0);
+
+    %this matrix gives us the index   spectral point to be saved for readout 
+    index_matrix = ones(size(phantom));
+  
+    for k=1:size(gradient,2)
         %Get current gradient and k space positions
         cur_grad = gradient(excite,k).G;
         cur_time = gradient(excite,k).time;
-      
+        cur_k = k_traj(excite, k);
+        
+        %Find k indecies for the readout point
+        cur_Kx = find((k_first==real(cur_k)),1);
+        cur_Ky = find((k_second==imag(cur_k)),1);
+        
+        %Find the first index that is zero at Kx and Ky. This is where the singal
+        %will be saved for thsi point
+        spacial_index = index_matrix(cur_Kx, cur_Ky);
+        
+        %calculate a matrix of the magentic field at each i,j position of
+        %the phantom
         grad_matrix = real(cur_grad)*phan_x + imag(cur_grad)*phan_y + B0;
         
         %calcuate the frequency of each position
         freq_matrix = gamma*(di_matrix.*grad_matrix/1e6 + grad_matrix - B0)*2*pi;
         
-        phantom_sig = zeros(size(new_phantom));
         %loop through phantom
-        for x = 1:x_phantom_size
-            for y = 1:y_phantom_size
+        for x = 1:size(phantom, 1)
+            for y = 1:size(phantom, 2)
                 
                 %if nothing is there skip
-                if isequal(new_phantom(x,y).d, I0)
+                if isequal(phantom(x,y).d, I0)
                     continue;
                 else
                     %get the number of rotations
@@ -84,41 +103,34 @@ parfor excite=1:size(gradient,1)
                     %create the hamiltonian
                     matrix_exp = expm(-1i*rotations*Iz);
                     %inverse hamiltonian is just the complex conjugate
-                    inverse_exp = expm(1i*rotations*Iz);
+                    inverse_exp = conj(matrix_exp);
                     
                     %apply sandwich operation
-                    new_phantom(x,y).d = matrix_exp*new_phantom(x,y).d*inverse_exp;
-                    
-                    if k~=1
-                        %save to signal
-                        phantom_sig(x,y) = trace(trace_matrix * new_phantom(x,y).d);
-                    end
+                    phantom(x,y).d = matrix_exp*phantom(x,y).d*inverse_exp;
+                    %save to signal
+                    S(cur_Kx, cur_Ky, x, y, spacial_index) = trace(trace_matrix * phantom(x,y).d);
                 end
             end
         end
         
-        if k == 1
-            new_phantom = MRSI_evolve(new_phantom, 1e-3-cur_time, 3, Ix);
-            for x = 1:x_phantom_size
-                for y = 1:y_phantom_size
-                    
-                    %if nothing is there skip
-                    if isequal(new_phantom(x,y).d, I0)
-                        continue;
-                    else
-                        phantom_sig(x,y) = trace(trace_matrix * new_phantom(x,y).d);
-                    end
-                end
-            end
+        index_matrix(cur_Kx, cur_Ky) = spacial_index + 1;
+        if(k == 1)
+            %Evolve
+            phantom = MRSI_evolve(phantom, evol_time-cur_time, 3, Ix);
+            %spin echo
+            phantom = MRSI_excite(phantom, 180, Fy, I0);
+            %Evolve again
+            phantom = MRSI_evolve(phantom, evol_time, 3, Ix);
         end
-        
-        
-        
-        S(excite, k) = sum(phantom_sig, 'all');
-        %index_matrix(cur_Kx, cur_Ky) = spacial_index + 1;
     end
 end
-S = MRSI_regrid(S, traj);
+
+s_size = size(S);
+%reshape to create one dimension for x and y dimension of phantom
+S = reshape(S, [s_size(1), s_size(2), length(phan_x)*length(phan_y), s_size(5)]);
+%sum the signal from x and y dimensions of the phantom
+S = squeeze(sum(S, 3));
+
 %TODO: apply t2 weighting for entire signal
 
 %convert to fid-a structure

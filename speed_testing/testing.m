@@ -1,6 +1,6 @@
 %% start
 clear 
-tic
+start = tic;
 gradient = load('grad.mat').grad;
 k_traj = load('traj.mat').traj;
 par = load('par.mat').par;
@@ -59,7 +59,8 @@ di_matrix = [phantom.dI];
 di_matrix = reshape(di_matrix, [size(phantom, 1), size(phantom, 2)]);
 trace_matrix = (Fx + 1i * Fy);
 index_matrix = ones(size(phantom));
-
+a1 = zeros(size(gradient,2)*400, 1);
+a2 = zeros(size(gradient,2)*400, 1);
 counter = 1;
 %% scan
 for k=1:size(gradient,2)
@@ -80,15 +81,27 @@ for k=1:size(gradient,2)
     freq_matrix = gamma*(di_matrix.*grad_matrix/1e6 + grad_matrix - B0)*2*pi;
     
     %freq_map = containers.Map('KeyType','double','ValueType','any');
-    
     for x = 1:size(phantom, 1)
-        for y = 1:size(phantom, 2)
+        for y = 1:ceil(size(phantom, 2)/2)
             if isequal(phantom(x,y).d, I0)
                 continue;
             else
+                
                 times = (freq_matrix(x,y)*cur_time);
-                phantom(x,y).d = expm(-1i*times*Iz)*phantom(x,y).d*expm(1i*times*Iz);
+                
+                matrix_exp = expm(-1i*times*Iz);
+                inverse_exp = conj(matrix_exp);
+                
+                phantom(x,y).d = matrix_exp*phantom(x,y).d*inverse_exp;
                 S(cur_Kx, cur_Ky, x, y, spacial_index) = trace(trace_matrix * phantom(x,y).d);
+
+                if(y ~= ceil(size(phantom, 2)/2) || mod(size(phantom,2),1) ~= 1)
+                    new_y = size(phantom,2)+1-y;
+                    phantom(x,new_y).d = inverse_exp*phantom(x,new_y).d*matrix_exp;
+                    S(cur_Kx, cur_Ky, x, new_y, spacial_index) = trace(trace_matrix * phantom(x,new_y).d);
+                end
+                counter = counter + 1;
+                
             end
         end
     end
@@ -98,4 +111,4 @@ end
 s_size = size(S);
 S = reshape(S, [s_size(1), s_size(2), length(phan_x)*length(phan_y), par.imageSize(3)]);
 S = sum(S, 3);
-toc
+toc(start);

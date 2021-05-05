@@ -1,33 +1,35 @@
 
-function out = MRSI_convert(fid, par)
+function out = MRSI_convert(fid, traj, B0)
     out.fids = fid;
     out.sz = size(fid);
-    out.t = par.t;
-    out.dwelltime = par.dwelltime;
-    out.spectralwidth = par.sw;
+    out.t = 0:1/traj.sw:1/traj.sw*(traj.imageSize(3)-1);
+    out.dwelltime = traj.dwellTime;
+    out.spectralwidth = traj.sw;
     out.txfrq = 0;
     out.date = date;
-    out.dims.t = 1;
-    out.dims.x = 2;
-    out.dims.y = 3;
-    out.Bo = par.B0;
+    out.dims.t = 3;
+    out.dims.x = 1;
+    out.dims.y = 2;
+    out.dims.coils = 0;
+    out.Bo = B0;
     out.seq = 'MRSI Simulation';
-    out.te = par.te;
-    out.tr = par.tr;
+    %TODO: Calculate  te in laod gradient
+    out.te = 0;
+    out.tr = traj.repetitionTime;
     out.pointsToLeftshift = 0;
-    out.fovX = par.fovX;
-    out.fovY = par.fovY;
-    out.fovZ = par.fovZ;
-    out.deltaX = par.deltaX;
-    out.deltaY = par.deltaY;
-    out.deltaZ = par.deltaZ;
-    out.deltaK_X = par.k_delta_x;
-    out.deltaK_Y = par.k_delta_y;
-    out.fovK_X = par.k_fov_x;
-    out.fovK_Y = par.k_fov_y;
+    out.fovX = traj.FoV.x;
+    out.fovY = traj.FoV.y;
+    out.fovZ = 1;
+    out.deltaX = traj.pixel_width.x;
+    out.deltaY = traj.pixel_width.y;
+    out.deltaZ = 1;
+    out.deltaK_X = traj.delta_K.x;
+    out.deltaK_Y = traj.delta_K.y;
+    out.fovK_X = traj.FovK.x;
+    out.fovK_Y = traj.FovK.y;
     out.imageOrigin = [0 0 0];
-    out.k_XCoordinates = par.k_min_x:k_delta_x:par.k_max_x;
-    out.k_YCoordinates = par.k_min_y:k_delta_y:par.k_max_y;
+    out.k_XCoordinates = -out.fovK_X/2+out.deltaK_X/2:out.deltaK_X:out.fovK_X/2-out.deltaK_X/2;
+    out.k_YCoordinates = -out.fovK_Y/2+out.deltaK_Y/2:out.deltaK_Y:out.fovK_Y/2-out.deltaK_Y/2;
 
     %FILLING IN THE FLAGS
     out.flags.writtentostruct=1;
