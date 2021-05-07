@@ -2,3 +2,4 @@ language: matlab
 matlab:
   - latest  # Default MATLAB release on Travis CI
   - R2020a
+scripts: matlab --batch testing/run_tests.m

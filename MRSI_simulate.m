@@ -3,7 +3,7 @@
 % Traj: trajectory class 
 % gMax: Maximum gradient strength in mT/m
 % B0: B0 magnetic field in T
-function [out] = simulate_MRSI(traj, gMax, B0)
+function [out] = MRSI_simulate(traj, gMax, B0)
 
 tic
 if ~exist('B0', 'var')
@@ -24,7 +24,7 @@ Fy = Iy;
 [gradient]  = load_trajectory(traj, gMax);
 
 %Create phantom
-phantom = MRSI_build_phantom(64, 64, 0.2, 0.2);
+phantom = MRSI_build_phantom(65, 65, 0.2, 0.2);
 
 %create an matrix of x coordinates (used for speedup)
 phan_x = [phantom.x];
@@ -49,6 +49,7 @@ S = complex(S, 0);
 readout_length = size(gradient, 2);
 x_phantom_size = size(phantom, 1);
 y_phantom_size = size(phantom, 2);
+
 %Now start readout:
 phantom = MRSI_excite(phantom, 90, Fy, I0);
 phantom = MRSI_evolve(phantom, 1e-3, 3, Ix);
@@ -111,8 +112,6 @@ parfor excite=1:size(gradient,1)
                 end
             end
         end
-        
-        
         
         S(excite, k) = sum(phantom_sig, 'all');
         %index_matrix(cur_Kx, cur_Ky) = spacial_index + 1;

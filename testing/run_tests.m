@@ -1,0 +1,2 @@
+tests = testsuite;
+results = run;
