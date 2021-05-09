@@ -1,7 +1,0 @@
-language: matlab
-matlab:
-  - latest  # Default MATLAB release on Travis CI
-  - R2020a
-os: 
-  - linux
-script: matlab -batch 'cd("testing"); results = runtests, assertSuccess(results)'
