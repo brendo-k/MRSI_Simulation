@@ -17,9 +17,9 @@ testCase.TestData.file = fopen('test.nii', 'r');
 testCase.TestData.bytes = fread(testCase.TestData.file);
 end
 
-function tearDown(testCase)
+function teardown(testCase)
 fclose(testCase.TestData.file);
-delete testCase.TestData.tempFile
+delete test.nii
 end
 
 function test_header_size(testCase)
@@ -54,7 +54,7 @@ deltaY = phantom(1,2).y - phantom(1,1).y;
 
 bytes = testCase.TestData.bytes;
 header = typecast(uint8(bytes(77:108))', 'single');
-verifyEqual(testCase, header, single([-1, deltaX, deltaY, 0, 0, 0, 0, 0]));
+verifyEqual(testCase, header, single([-1, deltaX*1000, deltaY*1000, 0, 0, 0, 0, 0]));
 end
 
 function test_vox_offset(testCase)
@@ -66,7 +66,7 @@ end
 function test_xyzt_units(testCase)
 bytes = testCase.TestData.bytes;
 header = uint8(bytes(124));
-verifyEqual(testCase, header, uint8(3));
+verifyEqual(testCase, header, uint8(2));
 end
 
 function test_description(testCase)
@@ -91,11 +91,14 @@ function test_srow(testCase)
 phantom = testCase.TestData.phantom;
 bytes = testCase.TestData.bytes;
 header = typecast(uint8(bytes(281:328))', 'single');
+deltaX = phantom(2,1).x - phantom(1,1).x;
+deltaY = phantom(1,2).y - phantom(1,1).y;
+
 row_x = header(1:4);
 row_y = header(5:8);
 row_z = header(9:12);
-verifyEqual(testCase, row_x, single([1, 0, 0, phantom(1,1).x]))
-verifyEqual(testCase, row_y, single([0, 1, 0, phantom(1,1).y]))
+verifyEqual(testCase, row_x, single([deltaX*1000, 0, 0, phantom(1,1).x*1000]))
+verifyEqual(testCase, row_y, single([0, deltaY*1000, 0, phantom(1,1).y*1000]))
 verifyEqual(testCase, row_z, single([0, 0, 1, 0]))
 end
 

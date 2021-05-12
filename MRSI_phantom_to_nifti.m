@@ -34,7 +34,7 @@ function V = MRSI_phantom_to_nifti(phantom, filename)
     pixdim = zeros(8,1);
     delta_x = phantom(2,1).x - phantom(1,1).x;
     delta_y = phantom(1,2).y - phantom(1,1).y;
-    pixdim(1:3) = [-1, delta_x, delta_y];
+    pixdim(1:3) = [-1, delta_x*1000, delta_y*1000];
     fwrite(f, pixdim, 'single');
     
     %vox_offset: number of bytes before the first signal position. Minimum
@@ -52,7 +52,7 @@ function V = MRSI_phantom_to_nifti(phantom, filename)
     %units are in mm. No temporal units.
     %xyzt_units: units for xyz and t. first 3 bits corrispond to xyz, and
     %next 3 corrispont to time. 011 -> mm 000 -> no time.
-    xyzt_units = 3;
+    xyzt_units = 2;
     fwrite(f, xyzt_units, 'int8');
     
     % float	cal_max	124B	4B	Maximum display intensity.
@@ -90,8 +90,8 @@ function V = MRSI_phantom_to_nifti(phantom, filename)
     fwrite(f, zeros(24,1), 'int8');
     
     %srows: rows of the affine matrix used to scale the points
-    srow_x = [1, 0, 0, phantom(1,1).x];
-    srow_y = [0, 1, 0, phantom(1,1).y];
+    srow_x = [delta_x*1000, 0, 0, phantom(1,1).x*1000];
+    srow_y = [0, delta_y*1000, 0, phantom(1,1).y*1000];
     srow_z = [0, 0, 1, 0];
     
     fwrite(f, [srow_x, srow_y, srow_z], 'single');
@@ -109,7 +109,7 @@ function V = MRSI_phantom_to_nifti(phantom, filename)
     signal = [phantom(:).dI];
     for i = 1:length(signal)
         if signal(i) == 1
-            signal(i) = 32767;
+            signal(i) = 1;
         end
     end
     fwrite(f, signal, 'int16');
