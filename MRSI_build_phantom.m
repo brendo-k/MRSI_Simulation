@@ -1,13 +1,20 @@
+%MRSI_build_phantom.m
+%This function creates a phantom that can be then used for simulations
+%
+%
 %Inputs
-%   phan_size: Size in x and y direction in meters
-%   met: 2d cell array of metabolites. met(i,j) represents metabolites at 
-%        position x(i), y(j)
+%   phan_size:  a 2 element vector of the size in x and y direction in meters 
+%               (eg. 0.2, 0.2 is 0.2 meters in both x and y directions)
+%   met:        2d cell array of metabolites. met(i,j) represents metabolites at 
+%               position x(i), y(j)
 %   
 
 %Output
-%   phantom: a [nx, ny] array containing voxel object
-%       phantom(i,j).d: density matrix at position i,j
-%       phantom(i,j).dI: chemical shift at position i,j
+%   phantom: a 2d matrix representing a phantom. phantom(i,j) represents a voxel.
+%       phantom(i,j).x:     x coordinate in m 
+%       phantom(i,j).y:     y coordinate in m  
+%       phantom(i,j).met:   vector of metabolites
+%           phantom(i,j).met(j) :metabolite basis from sim_hamiltonian. Also includes density matrix
 
 function [phantom] = MRSI_build_phantom(phan_size, met, b0)
 
