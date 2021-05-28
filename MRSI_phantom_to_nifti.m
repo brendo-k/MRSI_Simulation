@@ -106,12 +106,18 @@ function V = MRSI_phantom_to_nifti(phantom, filename)
     fwrite(f, magic_str, 'char*1');
     fwrite(f, [0,0,0,0], 'int8');
     
-    signal = [phantom(:).dI];
-    for i = 1:length(signal)
-        if signal(i) == 1
-            signal(i) = 1;
+    signal = numel(phantom);
+    for y = 1:size(phantom, 2)
+        for x = 1:size(phantom, 1)
+            if isequal(phantom(x,y).met, [])
+                sig = 0;
+            else
+                sig = 1;
+            end
+            signal(size(phantom, 1)*(y-1) + x) = sig;
         end
     end
+
     fwrite(f, signal, 'int16');
     
     fclose(f);

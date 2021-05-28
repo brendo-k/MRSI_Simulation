@@ -1,11 +1,23 @@
+function [phantom] = MRSI_excite(phantom, deg, direction)
+    %direction should be either x  or y
+    if(~strcmp(direction, 'y') && ~strcmp(direction, 'x'))
+        error('direciton should be either x or y');
+    end
 
-function [phantom] = MRSI_excite(phantom, deg, Fy, I0)
-    angle = deg*(pi/180);
-    HExcite = Fy*angle;
+    %convert flip angle to readians
+    flip_angle = deg*(pi/180);
     for x = 1:size(phantom, 1)
         for y = 1:size(phantom, 2)
-            if(~isequal(phantom(x,y).d, I0))
-                phantom(x,y).d = expm(-1i*HExcite)*phantom(x,y).d*expm(1i*HExcite);
+            for m = 1:length(phantom(i,j).met)
+                %getting proper excitation hamiltonian for flip direction
+                if(strcmp(direction, 'y'))
+                    HExcite = phantom(i, j).met(m).Fy*flip_angle;
+                else
+                    HExcite = phantom(i, j).met(m).Fx*flip_angle;
+                end
+                %sandwich opperator
+                phantom(x,y).met(m).d = expm(-1i*HExcite)*phantom(x,y).met(m).d*...
+                                    expm(1i*HExcite);
             end
         end
     end
