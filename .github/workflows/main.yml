@@ -13,6 +13,13 @@ jobs:
    runs-on: ubuntu-latest
    steps:
      - uses: actions/checkout@v2
-     - uses: joergbrech/moxunit-action@v1
+     - uses: joergbrech/moxunit-action@master
        with:
          tests: tests
+         with_coverage: true
+         doc_tests: true
+         cover_xml_file: coverage.xml
+     - uses: codecov/codecov-action@v1
+       with:
+         file: ./coverage.xml
+
