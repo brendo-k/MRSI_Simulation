@@ -16,6 +16,7 @@ jobs:
      - uses: joergbrech/moxunit-action@master
        with:
          tests: tests
+         src: MRSI_Simulator
          with_coverage: true
          doc_tests: true
          cover_xml_file: coverage.xml
