@@ -1,3 +1,13 @@
+%MRSI_evolve.m
+%Lets the spins of the phantom go thorugh free evolution for a given time
+%Input
+%   phantom:Phantom object from MRSI_build_phantom
+%   time:   time fo evolution (s)
+%   B0:     Magnetic field strength b0;
+%
+%Output
+%   phantom: phantom after free evolution 
+
 function [phantom] = MRSI_evolve(phantom, time, B0)
     gamma=42577000;  %[Hz/T]
     for x = 1:size(phantom, 1)
