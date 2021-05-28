@@ -10,14 +10,12 @@ jobs:
  build:
    runs-on: ubuntu-latest
    steps:
-     - name: Check out repository
      - uses: actions/checkout@v2
-     - name: MOxUnit tests
      - uses: joergbrech/moxunit-action@master
        with:
-         tests: tests
-         with_coverage: true
-         cover_xml_file: coverage.xml
+        tests: tests my_extra_testfile.m
+        with_coverage: true
+        cover_xml_file: coverage.xml
      - uses: codecov/codecov-action@v1
        with:
-         file: ./coverage.xml
+        file: ./coverage.xml
