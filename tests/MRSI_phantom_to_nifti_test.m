@@ -1,4 +1,4 @@
-function test_suite = MRSI_phantom_to_nifti
+function test_suite = MRSI_phantom_to_nifti_test
 try % assignment of 'localfunctions' is necessary in Matlab >= 2016
     test_functions=localfunctions();
 catch % no problem; early Matlab versions can use initTestSuite fine
