@@ -1,12 +1,13 @@
 
-%Inputs: 
-% Traj: trajectory class 
+%Inputs:
+% Traj: trajectory class
 % gMax: Maximum gradient strength in mT/m
 % B0: B0 magnetic field in T
-function [out] = MRSI_simulate(traj, phantom, gMax, B0)
+function [out, voxel_sig] = MRSI_simulate(traj, phantom, gMax, B0)
 
 tic
 if ~exist('phantom', 'var')
+    disp('hello')
     metabolites = cell(64,64);
     metabolites(10:50, 10:50) = sysLac;
     metabolites(20:40, 20:40) = sysH2O;
@@ -44,11 +45,13 @@ x_phantom_size = size(phantom, 1);
 y_phantom_size = size(phantom, 2);
 
 %Now start readout:
-phantom = MRSI_excite(phantom, 90, 'y');
+phantom = MRSI_excite(phantom, 90, 'x');
 phantom = MRSI_evolve(phantom, 1e-3, 3);
-phantom = MRSI_excite(phantom, 180, 'x');
+phantom = MRSI_excite(phantom, 180, 'y');
 
-parfor excite=1:size(gradient,1)
+voxel_sig = complex(zeros(size(gradient,1), size(gradient, 2), x_phantom_size, y_phantom_size), 0);
+
+for excite=1:size(gradient,1)
     fprintf("simulating excitation number %d\n", excite)
     
     %Excite phantom
@@ -58,64 +61,55 @@ parfor excite=1:size(gradient,1)
         %Get current gradient and k space positions
         cur_grad = gradient(excite,k).G;
         cur_time = gradient(excite,k).time;
-      
+        
         grad_matrix = real(cur_grad)*phan_x + imag(cur_grad)*phan_y + B0;
-        
-        %calcuate the frequency of each position
-        freq_matrix = gamma*(di_matrix.*grad_matrix/1e6 + grad_matrix - B0)*2*pi;
-        
         phantom_sig = zeros(size(new_phantom));
         %loop through phantom
         for x = 1:x_phantom_size
             for y = 1:y_phantom_size
                 for m = 1:length(new_phantom(x,y).met)
-
-                    %if nothing is there skip
-                    if isequal(new_phantom(x,y).met(m).d, I0)
-                        continue;
-                    else
-                        %get the number of rotations
-                        rotations = (freq_matrix(x,y)*cur_time);
-
-                        %create the hamiltonian
-                        matrix_exp = expm(-1i*rotations*new_phantom(x,y).met(m).Iz);
-                        %inverse hamiltonian is just the complex conjugate
-                        inverse_exp = expm(1i*rotations*new_phantom(x,y).met(m).Iz);
-
-                        %apply sandwich operation
-                        new_phantom(x,y).met(m).d = matrix_exp*new_phantom(x,y).d...
-                                                    *inverse_exp;
-
-                        if k~=1
-                            %save to signal
-                            
-                            trace_matrix = new_phantom(x,y).met(m).Fx + new_phantom(x,y).met(m).Fy;
-                            phantom_sig(x,y) = trace(trace_matrix * new_phantom(x,y).met(m).d);
-                        end
+                    dI_eff = (new_phantom(x,y).met(m).shifts*grad_matrix(x,y)/1e6 + grad_matrix(x,y) - B0)*1e6/B0;
+                    shift_rads = dI_eff*2*pi*gamma*B0/1e6;
+                    Iz = new_phantom(x,y).met(m).Iz ;
+                    HAB = complex(zeros(size(Iz,1), size(Iz,2)),0);
+                    for spin  = 1:size(Iz,3)
+                        HAB = HAB + Iz(:,:,spin)*shift_rads(spin);
+                    end
+                    HAB = HAB + new_phantom(x,y).met(m).HABJonly;
+                    %create the hamiltonian
+                    matrix_exp = expm(-1i*HAB*cur_time);
+                    %inverse hamiltonian is just the complex conjugate
+                    inverse_exp = expm(1i*HAB*cur_time);
+                    
+                    %apply sandwich operation
+                    new_phantom(x,y).met(m).d{1} = matrix_exp*new_phantom(x,y).met(m).d{1}...
+                        *inverse_exp;
+                   
+                    if k~=1
+                        %save to signal
+                        trace_matrix = new_phantom(x,y).met(m).Fx + 1i*new_phantom(x,y).met(m).Fy;
+                        phantom_sig(x,y) = trace(trace_matrix * new_phantom(x,y).met(m).d{1});
+                        voxel_sig(excite, k, x, y) = phantom_sig(x,y);
                     end
                 end
+                
             end
         end
         
         if k == 1
-            new_phantom = MRSI_evolve(new_phantom, 1e-3-cur_time, 3, Ix);
+            new_phantom = MRSI_evolve(new_phantom, 1e-3-cur_time, 3);
             for x = 1:x_phantom_size
                 for y = 1:y_phantom_size
-                    for m = 1:length(new_phantom(x,y).met(m))
-                        %if nothing is there skip
-                        if isequal(new_phantom(x,y).met(m).d, eye(2))
-                            continue;
-                        else
-                            trace_matrix = new_phantom(x,y).met(m).Fx + new_phantom(x,y).met(m).Fy;
-                            phantom_sig(x,y) = trace(trace_matrix * new_phantom(x,y).met(m).d);
-                        end
+                    for m = 1:length(new_phantom(x,y).met)
+                        trace_matrix = new_phantom(x,y).met(m).Fx + 1i*new_phantom(x,y).met(m).Fy;
+                        phantom_sig(x,y) = trace(trace_matrix * new_phantom(x,y).met(m).d{1});
+                        voxel_sig(excite, k, x, y) = phantom_sig(x,y);
                     end
                 end
             end
         end
         
         S(excite, k) = sum(phantom_sig, 'all');
-        %index_matrix(cur_Kx, cur_Ky) = spacial_index + 1;
     end
 end
 S = MRSI_regrid(S, traj);

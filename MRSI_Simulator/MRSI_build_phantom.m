@@ -7,6 +7,7 @@
 %               (eg. 0.2, 0.2 is 0.2 meters in both x and y directions)
 %   met:        2d cell array of metabolites. met(i,j) represents metabolites at 
 %               position x(i), y(j)
+%   b0:         b0 field strength
 %   
 
 %Output
