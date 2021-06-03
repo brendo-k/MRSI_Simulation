@@ -3,7 +3,8 @@
 % Traj: trajectory class
 % gMax: Maximum gradient strength in mT/m
 % B0: B0 magnetic field in T
-function [out, voxel_sig] = MRSI_simulate(traj, phantom, gMax, B0)
+% T2star: T2star weighting in seconds
+function [out, voxel_sig] = MRSI_simulate(traj, phantom, gMax, B0, T2star)
 
 tic
 if ~exist('phantom', 'var')
@@ -45,13 +46,13 @@ x_phantom_size = size(phantom, 1);
 y_phantom_size = size(phantom, 2);
 
 %Now start readout:
-phantom = MRSI_excite(phantom, 90, 'x');
-phantom = MRSI_evolve(phantom, 1e-3, 3);
-phantom = MRSI_excite(phantom, 180, 'y');
+phantom = MRSI_excite(phantom, 90, 'y');
+phantom = MRSI_evolve(phantom, 1e-3);
+phantom = MRSI_excite(phantom, 180, 'x');
 
 voxel_sig = complex(zeros(size(gradient,1), size(gradient, 2), x_phantom_size, y_phantom_size), 0);
 
-for excite=1:size(gradient,1)
+parfor excite=1:size(gradient,1)
     fprintf("simulating excitation number %d\n", excite)
     
     %Excite phantom
@@ -69,7 +70,7 @@ for excite=1:size(gradient,1)
             for y = 1:y_phantom_size
                 for m = 1:length(new_phantom(x,y).met)
                     dI_eff = (new_phantom(x,y).met(m).shifts*grad_matrix(x,y)/1e6 + grad_matrix(x,y) - B0)*1e6/B0;
-                    shift_rads = dI_eff*2*pi*gamma*B0/1e6;
+                    shift_rads = dI_eff*-2*pi*gamma*B0/1e6;
                     Iz = new_phantom(x,y).met(m).Iz ;
                     HAB = complex(zeros(size(Iz,1), size(Iz,2)),0);
                     for spin  = 1:size(Iz,3)
@@ -97,7 +98,7 @@ for excite=1:size(gradient,1)
         end
         
         if k == 1
-            new_phantom = MRSI_evolve(new_phantom, 1e-3-cur_time, 3);
+            new_phantom = MRSI_evolve(new_phantom, 1e-3-cur_time);
             for x = 1:x_phantom_size
                 for y = 1:y_phantom_size
                     for m = 1:length(new_phantom(x,y).met)
@@ -111,12 +112,21 @@ for excite=1:size(gradient,1)
         
         S(excite, k) = sum(phantom_sig, 'all');
     end
+    
 end
+
+t = 0:1/traj.sw:1/traj.sw*(traj.imageSize(3)-1);
+%apply T2 weighting
+for excite = 1:size(S, 1)
+    S(excite,:) = S(excite,:).*exp(-t/T2star);
+end
+
 S = MRSI_regrid(S, traj);
 %TODO: apply t2 weighting for entire signal
 
 %convert to fid-a structure
 out = MRSI_convert(S, traj, B0);
+
 toc
 end
 

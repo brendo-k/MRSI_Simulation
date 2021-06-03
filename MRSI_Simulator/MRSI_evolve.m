@@ -8,7 +8,7 @@
 %Output
 %   phantom: phantom after free evolution 
 
-function [phantom] = MRSI_evolve(phantom, time, B0)
+function [phantom] = MRSI_evolve(phantom, time)
     gamma=42577000;  %[Hz/T]
     for x = 1:size(phantom, 1)
         for y = 1:size(phantom, 2)
