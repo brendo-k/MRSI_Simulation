@@ -4,15 +4,12 @@
 %tradition MRSI's first dimension would be each excitation (in order) while the second is
 %the position during the readout of that excitation. Numbers are complex to
 %represent x and y positions
-%
-% Input:
-% traj: k_space trajectory
-% gMax: gradient max [mT/m] -> T/mm
-function [gradientTraj] = MRSI_load_ktrajectory(traj, gMax) 
+function [gradientTraj] = MRSI_load_ktrajectory_gpu(traj, gMax) 
 
     dwellTime = traj.dwellTime;
-    gMax = gMax/(10^6);
-    
+    %convert to T/m
+    gMax = gMax*10^-3;
+
     %gyromagnetic for H
     gyromagneticRatio = 42.577478518e6; %[Hz⋅T^−1]
     k_traj = traj.k_trajectory;
@@ -44,9 +41,6 @@ function [gradientTraj] = MRSI_load_ktrajectory(traj, gMax)
                 %Get the gradient to get to the first k position over max
                 %timie
                 gradient_diff = k_diff/(max_time * gyromagneticRatio);
-                if(isnan(gradient_diff))
-                    gradient_diff = 0;
-                end
                 
                 %set variable to be added to the struct
                 time = max_time;

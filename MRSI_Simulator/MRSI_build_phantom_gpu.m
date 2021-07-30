@@ -3,8 +3,8 @@
 %
 %
 %Inputs
-%   phan_size:  a 2 element vector of the size in x and y direction in mm 
-%               (eg. 200, 200 is 200 mm in both x and y directions)
+%   phan_size:  a 2 element vector of the size in x and y direction in meters 
+%               (eg. 0.2, 0.2 is 0.2 meters in both x and y directions)
 %   met:        2d cell array of metabolites. met(i,j) represents metabolites at 
 %               position x(i), y(j)
 %   b0:         b0 field strength
@@ -12,12 +12,12 @@
 
 %Output
 %   phantom: a 2d matrix representing a phantom. phantom(i,j) represents a voxel.
-%       phantom(i,j).x:     x coordinate in mm 
-%       phantom(i,j).y:     y coordinate in mm
+%       phantom(i,j).x:     x coordinate in m 
+%       phantom(i,j).y:     y coordinate in m  
 %       phantom(i,j).met:   vector of metabolites
 %           phantom(i,j).met(j) :metabolite basis from sim_hamiltonian. Also includes density matrix
 
-function [phantom] = MRSI_build_phantom(phan_size, met, b0)
+function [phantom] = MRSI_build_phantom_gpu(phan_size, met, b0)
 
 %tests to make sure input arguments are vectors of size 1,2
 validateattributes(phan_size,{'numeric'},{'size', [1,2]})
@@ -62,7 +62,7 @@ for i = length(phan_x):-1:1
             metabolites = [];
         end
         phantom(i,j).met = metabolites;
-        phantom(i,j).d = d;
+        phantom(i,j).d = gpuArray(d);
     end
 end
 end

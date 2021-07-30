@@ -14,7 +14,7 @@ function [phantom] = MRSI_evolve(phantom, time)
         for y = 1:size(phantom, 2)
             for m = 1:length(phantom(x,y).met)
                 Hevol = phantom(x,y).met(m).HAB;
-                phantom(x,y).met(m).d{1} = expm(-1i*Hevol*time)*phantom(x,y).met(m).d{1}*...
+                phantom(x,y).d{m} = expm(-1i*Hevol*time)*phantom(x,y).d{m}*...
                                         expm(1i*Hevol*time);
             end
         end

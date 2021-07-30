@@ -16,7 +16,7 @@ function [phantom] = MRSI_excite(phantom, deg, direction)
                     HExcite = phantom(x, y).met(m).Fx*flip_angle;
                 end
                 %sandwich opperator
-                phantom(x,y).met(m).d{1} = expm(-1i*HExcite)*phantom(x,y).met(m).d{1}*...
+                phantom(x,y).d{m} = expm(-1i*HExcite)*phantom(x,y).d{m}*...
                     expm(1i*HExcite);
             end
         end
