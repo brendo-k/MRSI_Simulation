@@ -5,7 +5,7 @@
 % the resulting signal from the k-space trajectory. Uses hamiltonians and
 % spin systems to simulate output.
 %
-%
+%_trajkkjkkkj:w;j;kj;kj
 %Inputs:
 % Traj: k-space trajectory object from MRSI simulations (use MRSI
 % trajectory simulation package)

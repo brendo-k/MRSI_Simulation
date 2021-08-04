@@ -3,24 +3,26 @@
 %
 %
 %Inputs
-%   phan_size:  a 2 element vector of the size in x and y direction in mm 
+%   phan_size:  a 2 element vector of the size in x and y direction in mm
 %               (eg. 200, 200 is 200 mm in both x and y directions)
-%   met:        2d cell array of metabolites. met(i,j) represents metabolites at 
+%   met:        2d cell array of metabolites. met(i,j) represents metabolites at
 %               position x(i), y(j)
 %   b0:         b0 field strength
-%   
+%
 
 %Output
 %   phantom: a 2d matrix representing a phantom. phantom(i,j) represents a voxel.
-%       phantom(i,j).x:     x coordinate in mm 
+%       phantom(i,j).x:     x coordinate in mm
 %       phantom(i,j).y:     y coordinate in mm
 %       phantom(i,j).met:   vector of metabolites
 %           phantom(i,j).met(j) :metabolite basis from sim_hamiltonian. Also includes density matrix
 
 function [phantom] = MRSI_build_phantom(phan_size, met, b0)
-
-%tests to make sure input arguments are vectors of size 1,2
-validateattributes(phan_size,{'numeric'},{'size', [1,2]})
+arguments
+    phan_size (1,2) double = [200, 200]
+    met (:, :) cell = make_cell()
+    b0 = 3;
+end
 
 %set phantom parameters
 phan_dX = phan_size(1)/size(met, 1);
@@ -65,4 +67,10 @@ for i = length(phan_x):-1:1
         phantom(i,j).d = d;
     end
 end
+end
+
+function metabolites = make_cell()
+load H2O.mat sysH2O;
+metabolites = cell(16,16);
+metabolites(7:8, 7:8) = {sysH2O};
 end
