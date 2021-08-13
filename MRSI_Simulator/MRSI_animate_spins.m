@@ -1,4 +1,5 @@
 function MRSI_animate_spins(voxels)
+
     figure
     for excite = 1:size(voxels, 1)        
         [x,y] = meshgrid(1:size(voxels,3), 1:size(voxels,4));

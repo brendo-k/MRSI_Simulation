@@ -48,11 +48,11 @@ if(isempty(phan_x))
 end
 
 %initalize phantom with empty structs
-for i = length(phan_x):-1:1
-    for j = length(phan_y):-1:1
+for j = length(phan_x):-1:1
+    for i = length(phan_y):-1:1
         %Set coordinate
-        phantom(i,j).x = phan_x(i);
-        phantom(i,j).y = phan_y(j);
+        phantom(i,j).x = phan_x(j);
+        phantom(i,j).y = phan_y(i);
         if(isempty(met{i,j}))
             continue
         end
@@ -72,5 +72,5 @@ end
 function metabolites = make_cell()
 load H2O.mat sysH2O;
 metabolites = cell(16,16);
-metabolites(7:8, 7:8) = {sysH2O};
+metabolites(10:12, 10:12) = {sysH2O};
 end

@@ -16,7 +16,7 @@ function out = MRSI_convert(fid, traj, B0)
     out.seq = 'MRSI Simulation';
     %TODO: Calculate  te in laod gradient
     out.te = 0;
-    out.tr = traj.repetitionTime;
+    out.tr = traj.TR;
     out.pointsToLeftshift = 0;
     out.fovX = traj.FoV.x;
     out.fovY = traj.FoV.y;
@@ -24,13 +24,8 @@ function out = MRSI_convert(fid, traj, B0)
     out.deltaX = traj.pixel_width.x; %[mm]
     out.deltaY = traj.pixel_width.y; %[mm]
     out.deltaZ = 1;
-    out.deltaK_X = traj.delta_K.x; %[mm^-1]
-    out.deltaK_Y = traj.delta_K.y; %[mm^-1]
-    out.fovK_X = traj.FovK.x/1000;
-    out.fovK_Y = traj.FovK.y/1000;
     out.imageOrigin = [0 0 0];
-    out.k_XCoordinates = -out.fovK_X/2+out.deltaK_X/2:out.deltaK_X:out.fovK_X/2-out.deltaK_X/2;
-    out.k_YCoordinates = -out.fovK_Y/2+out.deltaK_Y/2:out.deltaK_Y:out.fovK_Y/2-out.deltaK_Y/2;
+
 
     %FILLING IN THE FLAGS
     out.flags.writtentostruct=1;
