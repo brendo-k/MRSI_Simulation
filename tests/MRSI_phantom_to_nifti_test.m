@@ -1,9 +1,9 @@
-function test_suite = MRSI_phantom_to_nifti_test
-try % assignment of 'localfunctions' is necessary in Matlab >= 2016
-    test_functions=localfunctions();
-catch % no problem; early Matlab versions can use initTestSuite fine
-end
-initTestSuite;
+function test_suite=MRSI_phantom_to_nifti_test
+    try % assignment of 'localfunctions' is necessary in Matlab >= 2016
+        test_functions=localfunctions();
+    catch % no problem; early Matlab versions can use initTestSuite fine
+    end
+    initTestSuite;
 end
 
 function [tempFile, file, bytes] = setup()
@@ -110,13 +110,13 @@ met = cell(64,64);
 phantom = MRSI_build_phantom([0.2,0.2], met, 3);
 bytes = bytes;
 header = typecast(uint8(bytes(281:328))', 'single');
-deltaX = phantom(2,1).x - phantom(1,1).x;
-deltaY = phantom(1,2).y - phantom(1,1).y;
+deltaX = phantom(2,1).y - phantom(1,1).y;
+deltaY = phantom(1,2).x - phantom(1,1).x;
 row_x = header(1:4);
 row_y = header(5:8);
 row_z = header(9:12);
-assertEqual(row_x, single([deltaX*1000, 0, 0, phantom(1,1).x*1000]))
-assertEqual(row_y, single([0, deltaY*1000, 0, phantom(1,1).y*1000]))
+assertEqual(row_x, single([deltaX, 0, 0, phantom(1,1).x]))
+assertEqual(row_y, single([0, deltaY, 0, phantom(1,1).y]))
 assertEqual(row_z, single([0, 0, 1, 0]))
 teardown(file);
 end

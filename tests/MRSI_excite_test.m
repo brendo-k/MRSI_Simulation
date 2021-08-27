@@ -20,7 +20,7 @@ Fx = phantom(1,1).met(1).Fx;
 Fy = phantom(1,1).met(1).Fy;
 
 evolved_phan = MRSI_excite(phantom, 90, 'x');
-sig = trace((Fx + 1i*Fy)*evolved_phan(1,1).met(1).d{1});
+sig = trace((Fx + 1i*Fy)*evolved_phan(1,1).d{1});
 assertElementsAlmostEqual(sig, 0 - 1i);
 end
 
@@ -39,8 +39,8 @@ Fy = phantom(1,1).met(1).Fy;
 
 evolved_phan_x = MRSI_excite(phantom, 0, 'x');
 evolved_phan_y = MRSI_excite(phantom, 0, 'y');
-sig_x = trace((Fx + 1i*Fy)*evolved_phan_x(1,1).met(1).d{1});
-sig_y = trace((Fx + 1i*Fy)*evolved_phan_y(1,1).met(1).d{1});
+sig_x = trace((Fx + 1i*Fy)*evolved_phan_x(1,1).d{1});
+sig_y = trace((Fx + 1i*Fy)*evolved_phan_y(1,1).d{1});
 assertEqual(sig_x, 0);
 assertEqual(sig_y, 0);
 end
@@ -59,7 +59,7 @@ Fx = phantom(1,1).met(1).Fx;
 Fy = phantom(1,1).met(1).Fy;
 
 evolved_phan = MRSI_excite(phantom, 90, 'y');
-sig = trace((Fx + 1i*Fy)*evolved_phan(1,1).met(1).d{1});
+sig = trace((Fx + 1i*Fy)*evolved_phan(1,1).d{1});
 assertElementsAlmostEqual(sig, 1 + 1i*0);
 end
 
@@ -78,8 +78,8 @@ Fy = phantom(1,1).met(1).Fy;
 
 excite_phan_x = MRSI_excite(phantom, 180, 'x');
 excite_phan_y = MRSI_excite(phantom, 180, 'y');
-sig_x = trace((Fx + 1i*Fy)*excite_phan_x(1,1).met(1).d{1});
-sig_y = trace((Fx + 1i*Fy)*excite_phan_y(1,1).met(1).d{1});
+sig_x = trace((Fx + 1i*Fy)*excite_phan_x(1,1).d{1});
+sig_y = trace((Fx + 1i*Fy)*excite_phan_y(1,1).d{1});
 assertElementsAlmostEqual(sig_x, 0);
 assertElementsAlmostEqual(sig_y, 0);
 end

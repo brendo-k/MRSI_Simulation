@@ -1,2 +1,3 @@
-tests = testsuite;
-results = run;
+addpath('../MRSI_Simulator/');
+moxunit_runtests
+rmpath('../MRSI_Simulator/');

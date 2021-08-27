@@ -20,7 +20,7 @@ function [out, voxel_sig] = MRSI_simulate(traj, phantom, gMax, B0, T2star)
     arguments
         traj (1,1) Trajectory
         phantom (:, :) struct 
-        gMax (1,1) double = 10
+        gMax (1,1) double = 30
         B0 (1,1) double = 3
         T2star (1,1) double = 0.1
     end

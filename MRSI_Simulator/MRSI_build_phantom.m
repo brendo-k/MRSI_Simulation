@@ -54,15 +54,14 @@ for j = length(phan_x):-1:1
         phantom(i,j).x = phan_x(j);
         phantom(i,j).y = phan_y(i);
         if(isempty(met{i,j}))
+            phantom(i,j).met = [];
+            phantom(i,j).d = [];
             continue
         end
         for m = 1:length(met{i,j})
             met{i,j}(m).shifts = met{i,j}(m).shifts - 4.65;
         end
         [metabolites, d] = sim_Hamiltonian(met{i,j}, b0);
-        if(~exist('metabolites','var'))
-            metabolites = [];
-        end
         phantom(i,j).met = metabolites;
         phantom(i,j).d = d;
     end

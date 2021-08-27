@@ -14,7 +14,7 @@ catch
 end
 met = {sysH2O};
 phantom = MRSI_build_phantom([0.2,0.2], met, 3);
-evolved_phan = MRSI_evolve(phantom, 0, 3);
+evolved_phan = MRSI_evolve(phantom, 0);
 assertEqual(evolved_phan, phantom);
 end
 
@@ -28,15 +28,15 @@ met = {sysH2O};
 gamma=42577000;  %[Hz/T]
 B0 = 3;
 phantom = MRSI_build_phantom([0.2, 0.2], met, B0);
-v_diff = sysH2O.shifts(1)*gamma*B0/10^6;
+v_diff = (sysH2O.shifts(1)-4.65)*gamma*B0/10^6;
 period = 1/v_diff;
 
 Fx = phantom(1,1).met(1).Fx;
 Fy = phantom(1,1).met(1).Fy;
 
-evolved_phan = MRSI_evolve(phantom, period, B0);
-sig = trace((Fx + 1i*Fy)*evolved_phan(1,1).met(1).d{1});
-before_sig = trace((Fx + 1i*Fy)*phantom(1,1).met(1).d{1});
+evolved_phan = MRSI_evolve(phantom, period);
+sig = trace((Fx + 1i*Fy)*evolved_phan(1,1).d{1});
+before_sig = trace((Fx + 1i*Fy)*phantom(1,1).d{1});
 assertElementsAlmostEqual(sig, before_sig);
 end
 
@@ -51,16 +51,16 @@ gamma=42577000;  %[Hz/T]
 B0 = 3;
 phantom = MRSI_build_phantom([0.2, 0.2], met, B0);
 phantom = MRSI_excite(phantom, 90, 'y');
-v_diff = sysH2O.shifts(1)*gamma*B0/10^6;
+v_diff = (sysH2O.shifts(1)-4.65)*gamma*B0/10^6;
 period = 1/v_diff;
 
 Fx = phantom(1,1).met(1).Fx;
 Fy = phantom(1,1).met(1).Fy;
 
-evolved_phan = MRSI_evolve(phantom, period, B0);
-sig = trace((Fx + 1i*Fy)*evolved_phan(1,1).met(1).d{1});
-before_sig = trace((Fx + 1i*Fy)*phantom(1,1).met(1).d{1});
-assertElementsAlmostEqual(sig, before_sig, 'absolute', 0.001);
+evolved_phan = MRSI_evolve(phantom, period);
+sig = trace((Fx + 1i*Fy)*evolved_phan(1,1).d{1});
+before_sig = trace((Fx + 1i*Fy)*phantom(1,1).d{1});
+assertElementsAlmostEqual(before_sig, sig, 'relative', 0.1);
 end
 
 function test_half_rotation()
@@ -74,16 +74,16 @@ gamma=42577000;  %[Hz/T]
 B0 = 3;
 phantom = MRSI_build_phantom([0.2, 0.2], met, B0);
 phantom = MRSI_excite(phantom, 90, 'y');
-v_diff = sysH2O.shifts(1)*gamma*B0/10^6;
+v_diff = (sysH2O.shifts(1)-4.65)*gamma*B0/10^6;
 period = 1/v_diff;
 
 Fx = phantom(1,1).met(1).Fx;
 Fy = phantom(1,1).met(1).Fy;
 
-evolved_phan = MRSI_evolve(phantom, period/2, B0);
-sig = trace((Fx + 1i*Fy)*evolved_phan(1,1).met(1).d{1});
-before_sig = trace((Fx + 1i*Fy)*phantom(1,1).met(1).d{1});
-assertElementsAlmostEqual(sig, -before_sig, 'absolute', 0.001);
+evolved_phan = MRSI_evolve(phantom, period/2);
+sig = trace((Fx + 1i*Fy)*evolved_phan(1,1).d{1});
+before_sig = trace((Fx + 1i*Fy)*phantom(1,1).d{1});
+assertElementsAlmostEqual(-before_sig, sig, 'relative', 0.001);
 end
 
 function test_quater_rotation()
@@ -97,15 +97,15 @@ gamma=42577000;  %[Hz/T]
 B0 = 3;
 phantom = MRSI_build_phantom([0.2, 0.2], met, B0);
 phantom = MRSI_excite(phantom, 90, 'y');
-v_diff = sysH2O.shifts(1)*gamma*B0/10^6;
+v_diff = (sysH2O.shifts(1)-4.65)*gamma*B0/10^6;
 period = 1/v_diff;
 
 Fx = phantom(1,1).met(1).Fx;
 Fy = phantom(1,1).met(1).Fy;
 
-evolved_phan = MRSI_evolve(phantom, period/4, B0);
-sig = trace((Fx + 1i*Fy)*evolved_phan(1,1).met(1).d{1});
-before_sig = trace((Fx + 1i*Fy)*phantom(1,1).met(1).d{1});
+evolved_phan = MRSI_evolve(phantom, period/4);
+sig = trace((Fx + 1i*Fy)*evolved_phan(1,1).d{1});
+before_sig = trace((Fx + 1i*Fy)*phantom(1,1).d{1});
 assertElementsAlmostEqual(sig, -1i*before_sig, 'absolute', 0.001);
 end
 
@@ -120,15 +120,15 @@ gamma=42577000;  %[Hz/T]
 B0 = 3;
 phantom = MRSI_build_phantom([0.2, 0.2], met, B0);
 phantom = MRSI_excite(phantom, 90, 'y');
-v_diff = sysH2O.shifts(1)*gamma*B0/10^6;
+v_diff = (sysH2O.shifts(1)-4.65)*gamma*B0/10^6;
 period = 1/v_diff;
 
 Fx = phantom(1,1).met(1).Fx;
 Fy = phantom(1,1).met(1).Fy;
 
-evolved_phan = MRSI_evolve(phantom, 3*period/4, B0);
-sig = trace((Fx + 1i*Fy)*evolved_phan(1,1).met(1).d{1});
-before_sig = trace((Fx + 1i*Fy)*phantom(1,1).met(1).d{1});
+evolved_phan = MRSI_evolve(phantom, 3*period/4);
+sig = trace((Fx + 1i*Fy)*evolved_phan(1,1).d{1});
+before_sig = trace((Fx + 1i*Fy)*phantom(1,1).d{1});
 assertElementsAlmostEqual(sig, 1i*before_sig, 'absolute', 0.001);
 end
 
@@ -143,13 +143,13 @@ gamma=42577000;  %[Hz/T]
 B0 = 3;
 phantom = MRSI_build_phantom([0.2, 0.2], met, B0);
 phantom = MRSI_excite(phantom, 90, 'y');
-v_diff = sysH2O.shifts(1)*gamma*B0/10^6;
+v_diff = (sysH2O.shifts(1)-4.65)*gamma*B0/10^6;
 period = 1/v_diff;
 
 Fx = phantom(1,1).met(1).Fx;
 Fy = phantom(1,1).met(1).Fy;
 
-evolved_phan = MRSI_evolve(phantom, period/8, B0);
-sig = trace((Fx + 1i*Fy)*evolved_phan(1,1).met(1).d{1});
+evolved_phan = MRSI_evolve(phantom, period/8);
+sig = trace((Fx + 1i*Fy)*evolved_phan(1,1).d{1});
 assertElementsAlmostEqual(sig, sqrt(1/2)-1i*sqrt(1/2), 'absolute', 0.001);
 end

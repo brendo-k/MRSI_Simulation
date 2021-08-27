@@ -32,8 +32,8 @@ function V = MRSI_phantom_to_nifti(phantom, filename)
     %pixdim: dimensions of a pixel in x,y,z directions. pixdim[0] is used
     %for the direction of the affine transformation
     pixdim = zeros(8,1);
-    delta_x = phantom(2,1).x - phantom(1,1).x;
-    delta_y = phantom(1,2).y - phantom(1,1).y;
+    delta_x = phantom(2,1).y - phantom(1,1).y;
+    delta_y = phantom(1,2).x - phantom(1,1).x;
     pixdim(1:3) = [-1, delta_x*1000, delta_y*1000];
     fwrite(f, pixdim, 'single');
     
@@ -90,8 +90,8 @@ function V = MRSI_phantom_to_nifti(phantom, filename)
     fwrite(f, zeros(24,1), 'int8');
     
     %srows: rows of the affine matrix used to scale the points
-    srow_x = [delta_x*1000, 0, 0, phantom(1,1).x*1000];
-    srow_y = [0, delta_y*1000, 0, phantom(1,1).y*1000];
+    srow_x = [delta_x, 0, 0, phantom(1,1).x];
+    srow_y = [0, delta_y, 0, phantom(1,1).y];
     srow_z = [0, 0, 1, 0];
     
     fwrite(f, [srow_x, srow_y, srow_z], 'single');
@@ -106,7 +106,7 @@ function V = MRSI_phantom_to_nifti(phantom, filename)
     fwrite(f, magic_str, 'char*1');
     fwrite(f, [0,0,0,0], 'int8');
     
-    signal = numel(phantom);
+    signal = zeros(numel(phantom),1);
     for y = 1:size(phantom, 2)
         for x = 1:size(phantom, 1)
             if isequal(phantom(x,y).met, [])
