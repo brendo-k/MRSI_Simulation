@@ -1,0 +1,1 @@
+!rm ./MRSI_Simulator/temp/* -rf
