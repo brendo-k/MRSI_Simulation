@@ -9,15 +9,20 @@
 %   phantom: phantom after free evolution 
 
 function [phantom] = MRSI_evolve(phantom, time)
-    gamma=42577000;  %[Hz/T]
-    for x = 1:size(phantom, 1)
-        for y = 1:size(phantom, 2)
-            for m = 1:length(phantom(x,y).met)
-                Hevol = phantom(x,y).met(m).HAB;
-                phantom(x,y).d{m} = expm(-1i*Hevol*time)*phantom(x,y).d{m}*...
-                                        expm(1i*Hevol*time);
-            end
-        end
-    end
+tic
+for m = 1:length(phantom.met)
+    
+    Hevol = expm(phantom.met(m).HAB*time*-1i);
+    inv_Hevol = expm(phantom.met(m).HAB*time*1i);
+    spins = phantom.spins{m};
+    spins = permute(spins, [3,4,1,2]);
+    spins = reshape(spins, size(spins,1), size(spins,2), []);
+    spins = pagemtimes(pagemtimes(Hevol,squeeze(spins)), inv_Hevol);
+    spins = reshape(spins, size(spins,1), size(spins,2), length(phantom.y), length(phantom.x));
+    spins = permute(spins, [3,4,1,2]);
+    phantom.spins{m} = spins;
+    clear spins;
+end
+toc
 end
 

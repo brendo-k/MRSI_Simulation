@@ -17,13 +17,13 @@
 % out: FID-A MRSI object
 % voxel_sig: REDUNDANT, to be used for annimations. WORK IN PROGRESS
 function [out, voxel_sig] = MRSI_simulate(traj, phantom, gMax, B0, T2star)
-    arguments
-        traj (1,1) Trajectory
-        phantom (:, :) struct 
-        gMax (1,1) double = 30
-        B0 (1,1) double = 3
-        T2star (1,1) double = 0.1
-    end
+arguments
+    traj (1,1) Trajectory
+    phantom (:, :) struct
+    gMax (1,1) double = 30
+    B0 (1,1) double = 3
+    T2star (1,1) double = 0.1
+end
 tic
 
 %gyromagnetic ratio
@@ -32,14 +32,11 @@ gamma=42577000;  %[Hz/T]
 %Calculate gradient, k space, and spatical parameters
 [gradient] = MRSI_load_ktrajectory(traj, gMax);
 
+%create an matrix of x and y coordinates (used for speedup)
+[phan_x, phan_y] = meshgrid(phantom.x, phantom.y);
 
-%create an matrix of x coordinates (used for speedup)
-phan_x = [phantom.x];
-phan_x = reshape(phan_x, [size(phantom, 1), size(phantom, 2)]);
-
-%create an matrix of y coordinates (used for speedup)
-phan_y = [phantom.y];
-phan_y = reshape(phan_y, [size(phantom, 1), size(phantom, 2)]);
+%Phantom size
+phan_size = size(phan_x);
 
 %Initalize array for signal readout
 S = zeros(size(traj.k_trajectory, 1), size(traj.k_trajectory,2));
@@ -47,8 +44,6 @@ S = zeros(size(traj.k_trajectory, 1), size(traj.k_trajectory,2));
 S = complex(S, 0);
 
 readout_length = size(gradient, 2);
-x_phantom_size = size(phantom, 1);
-y_phantom_size = size(phantom, 2);
 
 %Now start readout:
 TE = 0.001;
@@ -58,7 +53,7 @@ phantom = MRSI_excite(phantom, 180, 'x');
 
 %voxel_sig = complex(zeros(size(gradient,1), size(gradient, 2), x_phantom_size, y_phantom_size), 0);
 
-parfor excite=1:size(gradient,1)
+for excite=1:size(gradient,1)
     fprintf("simulating excitation number %d\n", excite)
     
     %Excite phantom
@@ -72,87 +67,72 @@ parfor excite=1:size(gradient,1)
         %apply gradient to x and y directions to form a gradient matrix.
         %grad_matrix has gradient strength at the x and y position;
         grad_matrix = real(cur_grad)*phan_x + imag(cur_grad)*phan_y + B0;
-        
-        phantom_sig = zeros(size(new_phantom));
+        phantom_sig = zeros(phan_size);
         
         %loop through phantom
-        for x = 1:x_phantom_size
-            for y = 1:y_phantom_size
-                
-                %get the voxel's metabolites
-                voxel = new_phantom(x,y).met;
-                
-                %loop through metabolites
-                for m = 1:length(voxel)
-                    
-                    %get the new ppm effective of each spin. 
-                    %This is derrived from ppm = ((v - v_ref)/v_ref)*10^6.
-                    %
-                    % (ppm*v_ref/10^6 - v_ref) = v. Where v_ref = (B0+G_x*x + G_y*y)*gamma
-                    %
-                    %(((ppm*v_ref/10^6 - v_ref)- v_ref_2)/v_ref_2)*10^6 = ((v-v_ref_2)/v_ref_2)*10^6 = dI_eff; where v_ref_2 = B0*gamma
-                    %
-                    %ppm_eff = (ppm*(B0+G*r)/10^6 + (B0+G*r) - B0)*10^6/B0
-                    %(gamma can be factored out)
-                    
-                    dI_eff = (new_phantom(x,y).met(m).shifts*grad_matrix(x,y)/1e6 + grad_matrix(x,y) - B0)*1e6/B0;
-                    
-                    %get the shift in radians
-                    shift_rads = dI_eff*2*pi*gamma*B0/1e6;
-                    %Iz spin state
-                    Iz = new_phantom(x,y).met(m).Iz;
-                    %reshape shift_rads 
-                    shift_rads = reshape(shift_rads, [1,1,length(shift_rads)]);
-                    
-                    %Calculate the HAB operator from the new frequencies
-                    HAB =  squeeze(sum(Iz.*shift_rads,3));
-                    %Add the j coupling to HAB operator
-                    HAB = HAB + new_phantom(x,y).met(m).HABJonly;
-                    
-                    %create the hamiltonian
-                    matrix_exp = expm(-1i*HAB*cur_time);
-                    %inverse hamiltonian is just the complex conjugate
-                    inverse_exp = conj(matrix_exp);
-                    
-                    %apply sandwich operation
-                    new_phantom(x,y).d{m} = matrix_exp*new_phantom(x,y).d{m}...
-                        *inverse_exp;
-                   
-                    %scaling factor
-                    val=2^(2-new_phantom(x,y).met(m).nspins);
+        for m = 1:length(phantom.spins)
+            if k~=1
+
+                %save to signal
+                phantom_sig(y,x) = phantom_sig(y,x) + readout(m, new_phantom);
+
+            end
             
-                    if k~=1
-                        %save to signal
-                        phantom_sig(x,y) = phantom_sig(x,y) + val*trace(new_phantom(x,y).met(m).Trc * new_phantom(x,y).d{m});
-                        %voxel_sig(excite, k, x, y) = phantom_sig(x,y);
-                    end
-                end
+            %get the metabolites
+            met = new_phantom.met(m);
+            
+            %get the new ppm effective of each spin.
+            %This is derrived from ppm = ((v - v_ref)/v_ref)*10^6.
+            %
+            % (ppm*v_ref/10^6 + v_ref) = v. Where v_ref = (B0+G_x*x + G_y*y)*gamma
+            %
+            %(((ppm*v_ref/10^6 + v_ref)- v_ref_2)/v_ref_2)*10^6 = ((v-v_ref_2)/v_ref_2)*10^6 = dI_eff; where v_ref_2 = B0*gamma
+            %
+            %ppm_eff = (ppm*(B0+G*r)/10^6 + (B0+G*r) - B0)*10^6/B0
+            %(gamma can be factored out)
+            gradients = repmat(grad_matrix, [1,1,length(met.shifts)]);
+            shifts = reshape(met.shifts, [1,1,length(met.shifts)]);
+            total_shifts = (gradients.*shifts/1e6 + gradients - 3)*1e6/B0;
+            
+            %vectorize dI_eff
+            total_shifts = reshape(total_shifts, phan_size(1)*phan_size(2), length(met.shifts));
+            
+            %get the shift in radians
+            shift_rads = total_shifts*2*pi*gamma*B0/1e6;
+            %Iz spin state
+            Iz = met.Iz;
+            HAB = zeros(phan_size(1)*phan_size(2),size(Iz, 1), size(Iz, 2));
+            shift_rads = reshape(shift_rads, phan_size(1)*phan_size(2), 1, []);
+            for i = size(shift_rads, 1)
+                HAB(i,:,:) = squeeze(sum(Iz.*shift_rads(i,1,:),3)) + met.HABJonly;
+            end
+            
+            for i = size(shift_rads,1)
+                matrix_exp = expm(-1i*squeeze(HAB(i,:,:))*cur_time);
+                %inverse hamiltonian is just the complex conjugate
+                inverse_exp = conj(matrix_exp);
+                [y,x] = ind2sub(phan_size, i);
+                new_phantom.spins{m}(y,x,:,:) = matrix_exp*squeeze(new_phantom.spins{m}(y,x,:,:))...
+                    *inverse_exp;
+                
             end
         end
-        
-        if k == 1
-            %refocusing pulse for spin echo
+        if(k == 1)
             new_phantom = MRSI_evolve(new_phantom, TE-cur_time);
-            for x = 1:x_phantom_size
-                for y = 1:y_phantom_size
-                    for m = 1:length(new_phantom(x,y).met)
-                        %get signal after refocusing pulse
-                        phantom_sig(x,y) = phantom_sig(x,y) + trace(new_phantom(x,y).met(m).Trc * new_phantom(x,y).d{m});
-                        %voxel_sig(excite, k, x, y) = phantom_sig(x,y);
-                    end
-                end
+            for m = 1:length(phantom.spins)
+                phantom_sig(y,x) = phantom_sig(y,x) + readout(m,new_phantom);
             end
         end
-        
-        S(excite, k) = sum(phantom_sig, 'all');
     end
     
+    
+    S(excite, k) = sum(phantom_sig, 'all');
 end
 
 t = 0:traj.dwellTime:traj.dwellTime*(size(traj.k_trajectory, 2)-1);
 %apply T2 weighting
 for excite = 1:size(S, 1)
-    S(excite,:) = S(excite,:).*exp(-t/T2star); 
+    S(excite,:) = S(excite,:).*exp(-t/T2star);
 end
 
 S = MRSI_regrid(S, traj);
@@ -162,3 +142,12 @@ out = MRSI_convert(S, traj, B0);
 toc
 end
 
+%get the readout from all voxels for metabolite m
+function phantom_sig = readout(m, phantom)
+for y = 1:length(phantom.y)
+    for x = 1:length(phantom.x)
+        scale=2^(2-phantom.met(m).nspins);
+        phantom_sig = scale*trace(new_phantom.met(m).Trc * squeeze(new_phantom.spins{m}(y,x,:,:)));
+    end
+end
+end

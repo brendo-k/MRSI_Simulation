@@ -1,12 +1,14 @@
 %MRSI_build_phantom.m
-%This function creates a phantom that can be then used for simulations
+%This function creates a phantom that can be then used for simulations. THe
+%scales are inverted because matlab uses the first dimension as y and the
+%second as x (This can be seen if you imagine matrix indexing).
 %
 %
 %Inputs
-%   phan_size:  a 2 element vector of the size in x and y direction in mm
-%               (eg. 200, 200 is 200 mm in both x and y directions)
+%   phan_size:  a 2 element vector of the size in y and x direction in mm
+%               (eg. 200, 200 is 200 mm in both y and x directions)
 %   met:        2d cell array of metabolites. met(i,j) represents metabolites at
-%               position x(i), y(j)
+%               position y(i), x(j)
 %   b0:         b0 field strength
 %
 
@@ -23,19 +25,56 @@ arguments
     met (:, :) cell = make_cell()
     b0 = 3;
 end
+%initalize metabolites to be 46 long
+all_mets(1:46) = struct('J', 0, 'shifts', 0, 'name', '', 'scaleFactor', 0);
+counter = 1;
+bool_metabolites = zeros(size(met,1), size(met,2), 46);
+for y = 1:size(met, 1) 
+    for x = 1:size(met, 2)
+        for m = 1:length(met{y,x})
+            names = {all_mets.name};
+            if(~strcmp(names, met{y,x}(m).name))
+                all_mets(counter) = met{y,x}(m);
+                all_mets(counter).shifts = all_mets(counter).shifts - 4.65;
+                counter = counter + 1;
+            end
+            bool_metabolites(y,x,strcmp(names, met{y,x}(m).name)) = 1;
+        end
+    end
+end
+bool_metabolites = logical(bool_metabolites);
+for m = 1:length(all_mets)
+    if(strcmp(all_mets(m).name, ''))
+        all_mets(m:end) = [];
+        break;
+    end
+end
+
+for m = length(all_mets):-1:1
+    [phantom.met(m), d] = sim_Hamiltonian(all_mets(m), b0);
+    phantom.d{m} = d{1};
+    phantom.met_names{m} = all_mets(m).name;
+    phantom.spins(m) = {zeros(size(met, 1), size(met, 2), size(d{1}, 1), size(d{1}, 2), 'single')};
+end
+
+names = {all_mets.name};
+%initalize phantom with empty structs
+for m = 1:length(all_mets)
+    for y = 1:size(bool_metabolites,1)
+        for x = 1:size(bool_metabolites,2)
+            phantom.spins{m}(y,x,:,:) = phantom.d{m};
+        end
+    end
+end
+
 
 %set phantom parameters
-phan_dX = phan_size(1)/size(met, 1);
-phan_dY = phan_size(2)/size(met, 2);
+phan_dY = phan_size(1)/size(met, 1);
+phan_dX = phan_size(2)/size(met, 2);
 
 %x coordinates for the phantom
-phan_x = -phan_size(1)/2 + phan_dX/2:phan_dX:phan_size(1)/2 - phan_dX/2;
-phan_y = -phan_size(2)/2 + phan_dY/2:phan_dY:phan_size(2)/2 - phan_dY/2;
-
-
-%make sure the size of phantom matches the size of met cell array
-assert(length(phan_x) == size(met, 1), 'Length of phantom along x should equal length of met along first dimension')
-assert(length(phan_y) == size(met, 2), 'Length of phantom along y should equal length of met along first dimension')
+phan_y = -phan_size(1)/2 + phan_dY/2:phan_dY:phan_size(1)/2 - phan_dY/2;
+phan_x = -phan_size(2)/2 + phan_dX/2:phan_dX:phan_size(2)/2 - phan_dX/2;
 
 %if the y dimension is empty allow one corrdinate of zero
 if(isempty(phan_y))
@@ -47,29 +86,18 @@ if(isempty(phan_x))
     phan_x = 0;
 end
 
-%initalize phantom with empty structs
-for j = length(phan_x):-1:1
-    for i = length(phan_y):-1:1
-        %Set coordinate
-        phantom(i,j).x = phan_x(j);
-        phantom(i,j).y = phan_y(i);
-        if(isempty(met{i,j}))
-            phantom(i,j).met = [];
-            phantom(i,j).d = [];
-            continue
-        end
-        for m = 1:length(met{i,j})
-            met{i,j}(m).shifts = met{i,j}(m).shifts - 4.65;
-        end
-        [metabolites, d] = sim_Hamiltonian(met{i,j}, b0);
-        phantom(i,j).met = metabolites;
-        phantom(i,j).d = d;
-    end
-end
+phantom.x = phan_x;
+phantom.y = phan_y;
+if(isempty(all_mets))
+    phantom.met = [];
+    phantom.d ={0};
+    phantom.met_names = {''};
+    phantom.spins = {zeros(length(phantom.y), length(phantom.x))};
 end
 
+end
 function metabolites = make_cell()
 load H2O.mat sysH2O;
-metabolites = cell(16,16);
+metabolites = cell(128,128);
 metabolites(10:12, 10:12) = {sysH2O};
 end
