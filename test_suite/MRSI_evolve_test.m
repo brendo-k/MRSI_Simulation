@@ -163,5 +163,5 @@ Fy = phantom(1,1).met(1).Fy;
 
 evolved_phan = MRSI_evolve(phantom, period/8);
 sig = trace((Fx + 1i*Fy)*squeeze(evolved_phan.spins{1}(1,1,:,:)));
-assertElementsAlmostEqual(sig, sqrt(1/2)-1i*sqrt(1/2), 'absolute', 0.001);
+assertElementsAlmostEqual(sig, sqrt(1/2)+1i*sqrt(1/2), 'absolute', 0.001);
 end

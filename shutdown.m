@@ -1,1 +1,1 @@
-!rm ./MRSI_Simulator/temp/* -rf
+delete_temp

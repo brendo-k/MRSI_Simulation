@@ -47,27 +47,28 @@ results = [phantom.met];
 assertEqual(results, [])
 end
 
+%make sure density matrix and Hamiltonians are properly copied over
 function test_water_sig()
 try
-    load H2O.mat
+    load H2O.mat sysH2O
 catch
     moxunit_throw_test_skipped_exception('Could not load H2O.mat, please add FID-A and subdirectories to path')
 end
     metabolites = cell(64,64);
     metabolites(30:35, 30:35) = {sysH2O}; 
     phantom = MRSI_build_phantom([0.2,0.2], metabolites, 3);
-    met = reshape([phantom.met], [6,6]);
-    den = reshape([phantom.d], [6,6]);
-    empty = phantom(setdiff(1:64, 30:35), setdiff(1:64, 30:35));
-    empty_met = [empty.met];
+    met = phantom.met(1);
+    den = phantom.spins{1};
+ 
 
     sysH2O.shifts = sysH2O.shifts - 4.65;
     [H, d] = sim_Hamiltonian(sysH2O, 3);
-    expected(1:6,1:6) = H;
-    assertEqual(expected, met)
-    expected2(1:6,1:6) = d;
-    assertEqual(den, expected2)
+   
+    assertEqual(H, met)
+    expected2 = den(30:35,30:35,:,:);
+    d = repmat(d{1}, [1,1,6,6]);
+    d = permute(d, [3,4,1,2]);
+    d = single(d);
+    assertEqual(d, expected2);
 
-    %array of empty arrays becomes an empty array
-    assertEqual(empty_met, [])
 end

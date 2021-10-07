@@ -1,9 +1,16 @@
-function [phantom] = load_maps(B0, slice)
+function [phantom] = load_maps(B0, slice, mets, MemoryOptions)
+arguments
+    B0 (1,1) double
+    slice (1,1) double {mustBePositive}
+    mets (:,1) struct = [];
+    MemoryOptions.use_disc (1,1) logical = 0
+end
     spins = load('spinSystems.mat');
     %Load maps
-    csf = spm_vol('../mni_icbm152_nlin_sym_09a/mni_icbm152_csf_tal_nlin_sym_09a.nii');
-    wm = spm_vol('../mni_icbm152_nlin_sym_09a/mni_icbm152_wm_tal_nlin_sym_09a.nii');
-    gm = spm_vol('../mni_icbm152_nlin_sym_09a/mni_icbm152_gm_tal_nlin_sym_09a.nii');
+    proj = currentProject;
+    csf = spm_vol(char(append(proj.RootFolder, '/mni_icbm152_nlin_sym_09a/mni_icbm152_csf_tal_nlin_sym_09a.nii')));
+    wm = spm_vol(char(append(proj.RootFolder, '/MNI152_2mm/wmMNI152_T1_2mm_brain.nii')));
+    gm = spm_vol(char(append(proj.RootFolder, '/MNI152_2mm/gmMNI152_T1_2mm_brain.nii')));
 
     %first dimension: sagital plane (x)
     %second dimension: coronal plane (y)
@@ -11,41 +18,49 @@ function [phantom] = load_maps(B0, slice)
     [phantom.csf, phantom.csf_mat] = spm_read_vols(csf);
     [phantom.wm, phantom.wm_mat] = spm_read_vols(wm);
     [phantom.gm, phantom.gm_mat] = spm_read_vols(gm);
-    %Calculate voxel size by taking the difference of the coordinates of the
-    %adjacent voxel. All maps are the same size, thus using csf.dim to
-    %calculate voxel size. If not, need to scale to same coordinates
+    
+    %permute to y dimension to be first. (Follows MATLAB's image dimension
+    %order). Flip first dimension to have front of head first. (ie. if
+    %plotted using imagesc() the front of the brain will be at the top)
     phantom.csf = flip(permute(phantom.csf, [2,1,3]), 1);
     phantom.gm = flip(permute(phantom.gm, [2,1,3]), 1);
     phantom.wm = flip(permute(phantom.wm, [2,1,3]), 1);
+    
+    if(slice > size(phantom.gm,3))
+        error('slice index is to big')
+    end
 
     %Calculate voxel size in x dimension
-    first_x = sub2ind(csf.dim, 1, 1, 1);
-    last_x = sub2ind(csf.dim, 2, 1, 1);
-    phantom.vox_x = phantom.csf_mat(1,last_x)-phantom.csf_mat(1,first_x);
+    first_x = sub2ind(wm.dim, 1, 1, 1);
+    last_x = sub2ind(wm.dim, 2, 1, 1);
+    phantom.vox_x = phantom.wm_mat(1,first_x)-phantom.wm_mat(1,last_x);
 
     %calculate voxel size in y direction
-    first_y = sub2ind(csf.dim, 1, 1, 1);
-    last_y = sub2ind(csf.dim, 1, 2, 1);
-    phantom.vox_y = phantom.csf_mat(2,last_y)-phantom.csf_mat(2,first_y);
+    first_y = sub2ind(wm.dim, 1, 1, 1);
+    last_y = sub2ind(wm.dim, 1, 2, 1);
+    phantom.vox_y = phantom.wm_mat(2,last_y)-phantom.wm_mat(2,first_y);
 
     %calculate voxel size in z direction
-    first_z = sub2ind(csf.dim, 1, 1, 1);
-    last_z = sub2ind(csf.dim, 1, 1, 2);
-    phantom.vox_z = phantom.csf_mat(3,last_z)-phantom.csf_mat(3,first_z);
+    first_z = sub2ind(wm.dim, 1, 1, 1);
+    last_z = sub2ind(wm.dim, 1, 1, 2);
+    phantom.vox_z = phantom.wm_mat(3,last_z)-phantom.wm_mat(3,first_z);
 
     %Calculating fov in each dimension
-    phantom.fovX = phantom.vox_x*csf.dim(1);
-    phantom.fovY = phantom.vox_y*csf.dim(2);
-    phantom.fovZ = phantom.vox_z*csf.dim(3);
+    phantom.fovX = phantom.vox_x*wm.dim(2);
+    phantom.fovY = phantom.vox_y*wm.dim(1);
+    phantom.fovZ = phantom.vox_z*wm.dim(3);
     
-
-    
-    metabolites = [spins.sysCr, spins.sysNAA, spins.sysNAAG, spins.sysPCh,...
-                    spins.sysGPC, spins.sysIns, spins.sysGlu, spins.sysGln, spins.sysH2O];
-    wm_met = metabolites;
-    gm_met = metabolites;
+    %if input metabolites are empty, add all metabolites
+    if(isempty(mets))
+        metabolites = [spins.sysCr, spins.sysNAA, spins.sysNAAG,...
+            spins.sysPCh, spins.sysGPC, spins.sysIns, spins.sysGlu,...
+            spins.sysGln, spins.sysH2O];
+    else
+        metabolites = mets;
+    end
     
     %Concentrations taken from Petra J. W. Pouwels and Jens Frahm 1998
+    %White matter concentrations
     Cr = mean([5.7 5.7 5.5]);
     NAA = mean([8.1 8.0 7.8]);
     NAAG = mean([1.5 2.7 2.6]);
@@ -53,31 +68,11 @@ function [phantom] = load_maps(B0, slice)
     Ins = mean([3.8  3.1 4.1]);
     Glu = mean([7.0  6.7 6.0]);
     Gln = mean([1.8  1.5 2.2]);
-    wm_conc = [Cr, NAA, NAAG, Cho, Ins, Glu, Gln];
-    max_conc_wm = max(wm_conc);
-    wm_conc = wm_conc/max_conc_wm;
-    wm_conc(end + 1) = 1;
-    for i = 1:length(wm_met)
-        if(i ==1)
-            c = 1;
-        elseif(i >=2 && i <= 3)
-            c = 2;
-        elseif(i >= 4 && i <= 6)
-            c = 3;
-        elseif(i >= 7 && i <= 11)
-            c = 4;
-        elseif(i == 12)
-            c = 5;
-        elseif(i == 13)
-            c = 6;
-        elseif(i == 14 || i == 15)
-            c = 7;
-        else
-            c = 8;
-        end
-        wm_met(i).scaleFactor = wm_met(i).scaleFactor * wm_conc(c);  
-    end
+    wm_conc = [Cr, NAA, NAAG, Cho, Ins, Glu, Gln, 1];
+    %create wm dictionary
     
+    %Concentrations taken from Petra J. W. Pouwels and Jens Frahm 1998
+    %grey matter concentrations
     Cr = mean([6.4 6.5 6.9 7.0]);
     NAA = mean([7.7 8.2 9.2 8.7]);
     NAAG = mean([0.7 0.5 1.4 0.8]);
@@ -85,37 +80,60 @@ function [phantom] = load_maps(B0, slice)
     Ins = mean([4.3 4.3 4.1 4.7]);
     Glu = mean([8.5 8.2 8.6 8.8]);
     Gln = mean([4.4 3.8 3.9 4.9]);
-
-    gm_conc = [Cr, NAA, NAAG, Cho, Ins, Glu, Gln];
-    max_conc_gm = max(gm_conc);
-    gm_conc = gm_conc/max_conc_gm;
-    gm_conc(end + 1) = 1;
-    for i = 1:length(gm_met)
-        if(i ==1)
-            c = 1;
-        elseif(i >=2 && i <= 3)
-            c = 2;
-        elseif(i >= 4 && i <= 6)
-            c = 3;
-        elseif(i >= 7 && i <= 11)
-            c = 4;
-        elseif(i == 12)
-            c = 5;
-        elseif(i == 13)
-            c = 6;
-        elseif(i == 14 || i == 15)
-            c = 7;
+    gm_conc = [Cr, NAA, NAAG, Cho, Ins, Glu, Gln, 1];
+    
+    conc_labels = {'Cr', 'NAA', 'NAAG', 'Cho', 'Ins', 'Glu', 'Gln', 'H2O'};
+    
+    %no we have to scale the metabolites down if there are multiple fid-a
+    %structures for one metabolite. We want the sum of all spins to equal
+    %the concentration
+    met_names = {metabolites.name};
+    %Fid-a spins have the metabolite name first then a '_' then part of the
+    %molecule (ie. CH2). Just extract metabolite name into occurrences.
+    occurrences = regexp(met_names, '^([a-zA-Z1-9]*)_?', 'tokens');
+    %convert cell of cells to cell array of strings;
+    occurrences = [occurrences{:}];
+    occurrences = [occurrences{:}];
+    %get number of occurences down scale concentration
+    for i = 1:length(gm_conc)
+        label = conc_labels{i};
+        if(strcmp(label, 'Cho'))
+            n_label = sum(strcmp(occurrences, 'PCh'));
+            n_label = n_label + sum(strcmp(occurrences, 'GPC'));
         else
-            c = 8;
+            n_label = sum(strcmp(occurrences, label));
         end
-        gm_met(i).scaleFactor = gm_met(i).scaleFactor * gm_conc(c);  
+        
+        %scale down the concentrations
+        wm_conc(i) = wm_conc(i)/n_label;
+        gm_conc(i) = gm_conc(i)/n_label;
     end
 
-    phantom.wm = phantom.wm > 0.5;
-    phantom.gm = phantom.gm > 0.5;
-
-    met_arr = cell(size(phantom.wm, 1), size(phantom.wm, 2));
-    met_arr(phantom.wm(:,:,slice) == 1) = {wm_met};
-    met_arr(phantom.gm(:,:,slice) == 1) = {gm_met};
-    phantom = MRSI_build_phantom_mem([phantom.fovY, phantom.fovX], met_arr, B0);
+    %create met cell array which is needed for build phantom
+    met_arr = cell(size(phantom.wm, [1,2]));
+    %initalize to be empty
+    for y = 1:size(phantom.wm,1)
+        for x = 1:size(phantom.wm,2)
+            counter = 1;
+            for m = 1:length(metabolites)
+                vox_met = metabolites(m);
+                [~, name] = regexp(metabolites(m).name, '^([a-zA-Z1-9]*)_?', 'match', 'tokens');
+                name = name{1}{1};
+                if(strcmp(name, 'PCh') || strcmp(name, 'GPC'))
+                    name = 'Cho';
+                end
+                idx = strcmp(conc_labels, name);
+                %scale each concentration by the intensity of the mni atlas
+                conc = wm_conc(idx)*phantom.wm(y,x,slice) + gm_conc(idx)*phantom.gm(y,x,slice);
+                vox_met.conc = conc;
+                
+                %add to met array
+                met_arr{y,x}(counter) = vox_met;
+                counter = counter + 1;
+                
+            end
+        end
+    end
+    
+    phantom = MRSI_build_phantom([phantom.fovY, phantom.fovX], met_arr, B0, 'use_disc', MemoryOptions.use_disc);
 end

@@ -10,39 +10,51 @@
 %   met:        2d cell array of metabolites. met(i,j) represents metabolites at
 %               position y(i), x(j)
 %   b0:         b0 field strength
+%   MemoryOptions: Key value argument pairs
+%       Key: 'use_disc' Value: logical (1 or 0) 
+%       Description: Boolean value to decide weather to save phantom object to disc as a binary file.
+%       Use this option if your computer does not have enough memory.
 %
 
 %Output
 %   phantom: a 2d matrix representing a phantom. phantom(i,j) represents a voxel.
-%       phantom(i,j).x:     x coordinate in mm
-%       phantom(i,j).y:     y coordinate in mm
-%       phantom(i,j).met:   vector of metabolites
+%       phantom.x:     x coordinate in mm
+%       phantom.y:     y coordinate in mm
+%       phantom.met(:   vector of metabolites
 %           phantom(i,j).met(j) :metabolite basis from sim_hamiltonian. Also includes density matrix
 
-function [phantom] = MRSI_build_phantom(phan_size, met, b0)
+function [phantom] = MRSI_build_phantom(phan_size, met, b0, MemoryOptions)
 arguments
     phan_size (1,2) double = [200, 200]
     met (:, :) cell = make_cell()
-    b0 = 3;
+    b0 (1,1) double {mustBeNonnegative} = 3
+    MemoryOptions.use_disc (1,1) logical = 0
 end
 %initalize metabolites to be 46 long
-all_mets(1:46) = struct('J', 0, 'shifts', 0, 'name', '', 'scaleFactor', 0);
+all_mets(1:46) = struct('J', 0, 'shifts', 0, 'name', '', 'scaleFactor', 0, 'conc', 0);
 counter = 1;
-bool_metabolites = zeros(size(met,1), size(met,2), 46);
+
+
+%get a list of all the metabolites that exist in the phantom
+bool_metabolites = zeros(size(met,1), size(met,2), 46, 'logical');
 for y = 1:size(met, 1) 
     for x = 1:size(met, 2)
         for m = 1:length(met{y,x})
+            %get list of names already found
             names = {all_mets.name};
+            %if met name is not in list, add to list
             if(~strcmp(names, met{y,x}(m).name))
                 all_mets(counter) = met{y,x}(m);
                 all_mets(counter).shifts = all_mets(counter).shifts - 4.65;
                 counter = counter + 1;
             end
+            %logical array for position of metabolites
             bool_metabolites(y,x,strcmp(names, met{y,x}(m).name)) = 1;
         end
     end
 end
-bool_metabolites = logical(bool_metabolites);
+
+%remove empty spaces in array
 for m = 1:length(all_mets)
     if(strcmp(all_mets(m).name, ''))
         all_mets(m:end) = [];
@@ -50,28 +62,53 @@ for m = 1:length(all_mets)
     end
 end
 
+%loop through all metabolites and get hamiltonian and density matrix
 for m = length(all_mets):-1:1
     [phantom.met(m), d] = sim_Hamiltonian(all_mets(m), b0);
-    phantom.d{m} = d{1};
+    phantom.d{m} = single(d{1});
     phantom.met_names{m} = all_mets(m).name;
     phantom.spins(m) = {zeros(size(met, 1), size(met, 2), size(d{1}, 1), size(d{1}, 2), 'single')};
+    
 end
-
-names = {all_mets.name};
+phantom.conc = zeros([size(met, [1,2]), length(all_mets)]);
 %initalize phantom with empty structs
 for m = 1:length(all_mets)
     for y = 1:size(bool_metabolites,1)
         for x = 1:size(bool_metabolites,2)
-            phantom.spins{m}(y,x,:,:) = phantom.d{m};
+            if(bool_metabolites(y,x,m))
+                
+                %find all names of metabolites at that voxel
+                names = {met{y,x}.name};
+                %get index of metabolite currently looping over
+                idx = strcmp(names, phantom.met_names{m});
+                cur_met = met{y,x}(idx);
+                if(isfield(cur_met, 'conc'))
+                    
+                    %multiply density matrix by concentration 
+                    phantom.spins{m}(y,x,:,:) = phantom.d{m}*met{y,x}(idx).conc;
+                    phantom.conc(y,x,m) = met{y,x}(idx).conc;
+                else
+                    %no concentration, assume uniform concentration
+                    phantom.spins{m}(y,x,:,:) = phantom.d{m};
+                    phantom.conc(y,x,m) = 1;
+                end
+            end
         end
+    end
+    if(MemoryOptions.use_disc)
+        phantom.file{m} = save_spins(phantom.spins{m}, phantom.met_names{m}, 'MRSI_build_phantom');
+        phantom.spins{m} = [];
     end
 end
 
+for m = 1:length(phantom.spins)
+    phantom.spins{m} = complex(phantom.spins{m});
+end
 
-%set phantom parameters
-phan_dY = phan_size(1)/size(met, 1);
+
+%set phantom phan_dY = phan_size(1)/size(met, 1);
 phan_dX = phan_size(2)/size(met, 2);
-
+phan_dY = phan_size(1)/size(met, 1);
 %x coordinates for the phantom
 phan_y = -phan_size(1)/2 + phan_dY/2:phan_dY:phan_size(1)/2 - phan_dY/2;
 phan_x = -phan_size(2)/2 + phan_dX/2:phan_dX:phan_size(2)/2 - phan_dX/2;
@@ -86,8 +123,11 @@ if(isempty(phan_x))
     phan_x = 0;
 end
 
+%add x and y values to phantom
 phantom.x = phan_x;
 phantom.y = phan_y;
+
+%if mets are empty fill with template values
 if(isempty(all_mets))
     phantom.met = [];
     phantom.d ={0};
@@ -98,6 +138,6 @@ end
 end
 function metabolites = make_cell()
 load H2O.mat sysH2O;
-metabolites = cell(128,128);
+metabolites = cell(32,32);
 metabolites(10:12, 10:12) = {sysH2O};
 end

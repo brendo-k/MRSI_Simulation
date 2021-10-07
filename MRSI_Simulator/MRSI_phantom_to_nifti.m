@@ -1,4 +1,9 @@
-function V = MRSI_phantom_to_nifti(phantom, filename)
+function V = MRSI_phantom_to_nifti(phantom, filename, met)
+    met = upper(met);
+    if(~contains(phantom.met_names, met))
+        error('input metabolite name does not exist in the phantom structure')
+    end
+
     %open the file
     f  = fopen(filename, 'w');
     
@@ -107,15 +112,17 @@ function V = MRSI_phantom_to_nifti(phantom, filename)
     fwrite(f, magic_str, 'char*1');
     fwrite(f, [0,0,0,0], 'int8');
     
+    phantom_met_names = phantom.met_names;
+    [met_prefix] = regexp(phantom_met_names, '^([a-zA-Z1-9]*)_?', 'tokens');
+    met_prefix = [met_prefix{:}];
+    met_prefix = [met_prefix{:}];
+    idx = strcmp(met_prefix, met);
+    
     signal = zeros(length(phantom.x)*length(phantom.y),1);
     for y = length(phantom.y):-1:1
         for x = 1:length(phantom.x)
-            spins = squeeze(phantom.spins{1}(y,x,:,:));
-            if isequal(spins, zeros(size(spins)))
-                sig = 0;
-            else
-                sig = 1;
-            end
+            sig = phantom.conc(y,x,idx);
+            sig = sum(sig,'all');
             signal(length(phantom.x)*(length(phantom.y) - y) + x) = sig;
         end
     end
