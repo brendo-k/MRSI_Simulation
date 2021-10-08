@@ -60,7 +60,7 @@ for m = 1:length(phantom.met)
     spins = MRSI_excite(spins, 180, 'x', 'argument_type', 'matrix', 'F', phantom.met(m).Fx);
     fprintf("simulating metabolite %s\n", phantom.met_names{m})
     scale = 2^(2-phantom.met(m).nspins);
-    trc = phantom.met(m).Trc;
+    trc = phantom.met(m).Fx + 1i*phantom.met(m).Fy;
     for excite=1:size(gradient,1)
         tic
         fprintf("simulating excitation number %d\n", excite)
@@ -183,12 +183,19 @@ HAB = HAB*1i*time;
 %initalize array for hamiltonian
 H = zeros(size(Fz, 1), size(Fz, 2), sum(idx), 'single');
 
-for i = 1:size(H, 3)
-    %check if there is a valid voxel at this location
-    %HAB = squeeze(sum(Iz.*shift_rads(i,1,:),3)) + met.HABJonly;
-    if(isdiag(HAB(:,:,i)))
-        H(:,:, i) = diag(exp(diag(HAB(:,:,i))));
-    else
+if(isdiag(HAB(:,:,1)))
+    m = size(HAB,1);
+    n = size(HAB,3);
+    
+    %get linearlized indexes of diagonals
+    diag_idx = bsxfun(@plus, [1:m+1:m*m]', [0:n-1]*m*m);
+    %extract diagonals from stack of matrices from idx
+    diag = HAB(diag_idx);
+    diag_exp = exp(diag);
+    H(diag_idx) = diag_exp;
+else
+    for i = 1:size(H, 3)
+        
         H(:,:, i) = expm(HAB(:,:,i));
     end
 end
