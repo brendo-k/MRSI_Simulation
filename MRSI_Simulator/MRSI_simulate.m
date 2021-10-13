@@ -84,8 +84,13 @@ for m = 1:length(phantom.met)
             %Calculate hamiltonians
             [H, H_inv] = calculate_H(phantom.met(m), grad_matrix,cur_time, B0, idx);
             
+            if(isdiag(H(:,:,1)))
+                non_zero_spins = pagemtimes(non_zero_spins, pagemtimes(H,H_inv));
+            else
+                non_zero_spins = pagemtimes(pagemtimes(H_inv, non_zero_spins), H);
+            end
             %apply hamiltonians across all voxels
-            non_zero_spins = pagemtimes(pagemtimes(H_inv, non_zero_spins), H);
+            
             
             %save to signal
             S(excite, k, m) = readout(non_zero_spins, trc, scale);
@@ -150,8 +155,8 @@ ppm_diff = ppm_eff - met.shifts(1);
 shift_rads = ppm_diff*2*pi*gamma*B0/1e6;
 shift_rads = reshape(shift_rads, 1,1,length(shift_rads));
 
-%DIAGONALIZE HERE SPEEDUP!!
-Fz = met.Fz;
+diag_idx = get_diag_index(size(met.Fz,1),1);
+Fz = met.Fz(diag_idx);
 %diag_idx = get_diage_index(size(Fz,1), 1);
 Fz = repmat(Fz, [1,1,size(ppm_eff, 1)]); 
 
@@ -162,23 +167,25 @@ add_HAB = Fz.*shift_rads;
 %sum along the third dimension (stack of matricies) and add HABJonly. 
 %Final dimensions are (size of Hamiltonian along first dimension, size of
 %Hamiltonian along second, and length of vectorized voxel positions)
-new_HAB = met.HAB + add_HAB;
-HAB = new_HAB.*(1i*time);
-%initalize array for hamiltonian
-H = complex(zeros([size(Fz, [1,2]), sum(idx)], 'like', single(1i)));
+new_HAB = repmat(met.HAB, [1,1,sum(idx)]);
+diag_idx = get_diag_index(size(met.Fz,1),sum(idx));
+new_HAB(diag_idx) = new_HAB(diag_idx) + squeeze(add_HAB);
+if(isdiag(new_HAB(:,:,1)))
+    m = size(new_HAB,1);
+    n = size(new_HAB,3);
+    diag_idx = get_diag_index(m,n);
 
-if(isdiag(HAB(:,:,1)))
-    m = size(HAB,1);
-    n = size(HAB,3);
+    HAB = new_HAB(diag_idx).*(1i*time);
+    %initalize array for hamiltonian
+    H = complex(zeros(size(new_HAB), 'like', single(1i)));
     
     %get linearlized indexes of diagonals
-    diag_idx = get_diag_index(m,n);
     %extract diagonals from stack of matrices from idx
-    H(diag_idx) = exp(HAB(diag_idx));
+    H(diag_idx) = exp(HAB);
 
 else
     for i = 1:size(H, 3)
-        
+        HAB = new_HAB.*(1i*time);
         H(:,:, i) = expm(HAB(:,:,i));
     end
 end

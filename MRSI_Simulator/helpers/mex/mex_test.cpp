@@ -2,6 +2,7 @@
 #include "mexAdapter.hpp"
 #include <iostream>
 #include <utility>
+#include <vector>
 
 using namespace matlab::data;
 using matlab::mex::ArgumentList;
@@ -61,11 +62,16 @@ public:
     void calculate_ppm(TypedArray<std::complex<float>>& gradients, 
                                                     TypedArray<double> spins)
     {
-        TypedArray<std::complex<float>> temp = TypedArray<std::complex<float>>(gradients);
-        Array result = matlabPtr -> feval(u"bsxfun", "@times", gradients, factory.createScalar(spins[0]/1000000));
-        Array result2 = matlabPtr -> feval(u"bsxfun", "@plus", temp, factory.createScalar(-1));
-        Array result3 = matlabPtr -> feval(u"plus", result, result2);
-        Array result4 = matlabPtr -> feval(u"bsxfun", "@times", result3, factory.createScalar(1000000));
+        std::vector<Array> args{factory.createScalar("@times"), 
+                        gradients, factory.createScalar(spins[0]/1000000)};
+        Array result = matlabPtr -> feval(u"bsxfun", "@times", args);
+
+        args = {gradients, factory.createScalar(-1)};
+        Array result2 = matlabPtr -> feval(u"bsxfun", "@plus", args);
+        args = {result, result2};
+        Array result3 = matlabPtr -> feval(u"plus", args);
+        args = {factory.createScalar("@times"), result, result2};
+        Array result4 = matlabPtr -> feval(u"bsxfun", args);
         gradients = std::move(result4);
     }
 };
