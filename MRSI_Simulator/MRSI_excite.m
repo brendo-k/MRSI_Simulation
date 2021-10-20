@@ -31,7 +31,7 @@ if(strcmp(ArgumentOptions.argument_type, 'struct'))
     
     for m = 1:length(phantom.met)
         if(MemoryOptions.use_disc)
-            spins = load_spins(phantom.file{m}, phantom,m);
+            spins = load_spins(phantom,m);
         else
             spins = phantom.spins{m};
         end

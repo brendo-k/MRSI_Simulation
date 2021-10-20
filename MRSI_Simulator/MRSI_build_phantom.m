@@ -23,15 +23,15 @@
 %       phantom.met(:   vector of metabolites
 %           phantom(i,j).met(j) :metabolite basis from sim_hamiltonian. Also includes density matrix
 
-function [phantom] = MRSI_build_phantom(phan_size, met, b0, MemoryOptions)
+function [phantom] = MRSI_build_phantom(phan_size, met, b0, T2_star, MemoryOptions)
 arguments
     phan_size (1,2) double = [200, 200]
     met (:, :) cell = make_cell()
     b0 (1,1) double {mustBeNonnegative} = 3
+    T2_star (:,1) double = 0.1;
     MemoryOptions.use_disc (1,1) logical = 0
 end
 %initalize metabolites to be 46 long
-all_mets(1:46) = struct('J', 0, 'shifts', 0, 'name', '', 'scaleFactor', 0, 'conc', 0);
 counter = 1;
 
 
@@ -40,14 +40,20 @@ bool_metabolites = zeros(size(met,1), size(met,2), 46, 'logical');
 for y = 1:size(met, 1) 
     for x = 1:size(met, 2)
         for m = 1:length(met{y,x})
+            if(exist('all_mets', 'var'))
             %get list of names already found
-            names = {all_mets.name};
+                names = {all_mets.name};
+            else
+                names = '';
+            end
             %if met name is not in list, add to list
             if(~strcmp(names, met{y,x}(m).name))
                 all_mets(counter) = met{y,x}(m);
+
                 all_mets(counter).shifts = all_mets(counter).shifts - 4.65;
                 counter = counter + 1;
             end
+            names = {all_mets.name};
             %logical array for position of metabolites
             bool_metabolites(y,x,strcmp(names, met{y,x}(m).name)) = 1;
         end
@@ -58,17 +64,21 @@ end
 for m = 1:length(all_mets)
     if(strcmp(all_mets(m).name, ''))
         all_mets(m:end) = [];
+        bool_metabolites(:,:,m:end) = [];
         break;
     end
 end
 
+if(length(T2_star) == 1)
+    T2_star = repmat(T2_star, [length(all_mets), 1]);
+end
 %loop through all metabolites and get hamiltonian and density matrix
 for m = length(all_mets):-1:1
     [phantom.met(m), d] = sim_Hamiltonian(all_mets(m), b0);
     phantom.d{m} = single(d{1});
     phantom.met_names{m} = all_mets(m).name;
     phantom.spins(m) = {zeros(size(met, 1), size(met, 2), size(d{1}, 1), size(d{1}, 2), 'single')};
-    
+    phantom.T2(m) = T2_star(m);
 end
 phantom.conc = zeros([size(met, [1,2]), length(all_mets)]);
 %initalize phantom with empty structs
@@ -133,6 +143,7 @@ if(isempty(all_mets))
     phantom.d ={0};
     phantom.met_names = {''};
     phantom.spins = {zeros(length(phantom.y), length(phantom.x))};
+    phantom.T2 = T2_star;
 end
 
 end

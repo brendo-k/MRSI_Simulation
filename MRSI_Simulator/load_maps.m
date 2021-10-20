@@ -1,11 +1,14 @@
-function [phantom] = load_maps(B0, slice, mets, MemoryOptions)
+function [phantom] = load_maps(B0, slice, mets, T2_met, T2_lip, MemoryOptions)
 arguments
     B0 (1,1) double
     slice (1,1) double {mustBePositive}
     mets (:,1) struct = [];
+    T2_met (1,1) double = 0.1;
+    T2_lip (1,1) double = 0.015;
     MemoryOptions.use_disc (1,1) logical = 0
 end
     spins = load('spinSystems.mat');
+    lipids = load('Lip.mat');
     %Load maps
     proj = currentProject;
     csf = spm_vol(char(append(proj.RootFolder, '/mni_icbm152_nlin_sym_09a/mni_icbm152_csf_tal_nlin_sym_09a.nii')));
@@ -54,7 +57,7 @@ end
     if(isempty(mets))
         metabolites = [spins.sysCr, spins.sysNAA, spins.sysNAAG,...
             spins.sysPCh, spins.sysGPC, spins.sysIns, spins.sysGlu,...
-            spins.sysGln, spins.sysH2O];
+            spins.sysGln, spins.sysH2O, lipids.sysLip];
     else
         metabolites = mets;
     end
@@ -68,7 +71,7 @@ end
     Ins = mean([3.8  3.1 4.1]);
     Glu = mean([7.0  6.7 6.0]);
     Gln = mean([1.8  1.5 2.2]);
-    wm_conc = [Cr, NAA, NAAG, Cho, Ins, Glu, Gln, 1];
+    wm_conc = [Cr, NAA, NAAG, Cho, Ins, Glu, Gln, 1, 1];
     %create wm dictionary
     
     %Concentrations taken from Petra J. W. Pouwels and Jens Frahm 1998
@@ -80,9 +83,9 @@ end
     Ins = mean([4.3 4.3 4.1 4.7]);
     Glu = mean([8.5 8.2 8.6 8.8]);
     Gln = mean([4.4 3.8 3.9 4.9]);
-    gm_conc = [Cr, NAA, NAAG, Cho, Ins, Glu, Gln, 1];
+    gm_conc = [Cr, NAA, NAAG, Cho, Ins, Glu, Gln, 1, 1];
     
-    conc_labels = {'Cr', 'NAA', 'NAAG', 'Cho', 'Ins', 'Glu', 'Gln', 'H2O'};
+    conc_labels = {'Cr', 'NAA', 'NAAG', 'Cho', 'Ins', 'Glu', 'Gln', 'Lipids', 'H2O'};
     
     %no we have to scale the metabolites down if there are multiple fid-a
     %structures for one metabolite. We want the sum of all spins to equal
@@ -134,6 +137,19 @@ end
             end
         end
     end
+
+    T2_star = zeros(length(metabolites), 1);
+    for m = 1:length(metabolites)
+        [~, name] = regexp(metabolites(m).name, '^([a-zA-Z1-9]*)_?', 'match', 'tokens');
+        name = name{1}{1};
+        if(strcmp(name, 'Lipids'))
+            T2_star(m) = T2_lip;
+        else
+            T2_star(m) = T2_met;
+        end
+    end
+
     
-    phantom = MRSI_build_phantom([phantom.fovY, phantom.fovX], met_arr, B0, 'use_disc', MemoryOptions.use_disc);
+    phantom = MRSI_build_phantom([phantom.fovY, phantom.fovX], met_arr, B0, T2_star,...
+        'use_disc', MemoryOptions.use_disc);
 end

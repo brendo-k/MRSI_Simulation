@@ -8,30 +8,32 @@
 % Input:
 % traj: k_space trajectory
 % gMax: gradient max [mT/m] -> T/mm
-function [gradientTraj] = MRSI_load_ktrajectory(traj, gMax) 
+function [gradientTraj, gradientTime] = MRSI_load_ktrajectory(traj, gMax) 
 
-    dwellTime = traj.dwellTime;
-    gMax = gMax/(10^6);
+    dwellTime = traj.dwellTime; %[s]
+    gMax = gMax/(10^6); %[T/mm]
     
     %gyromagnetic for H
     gyromagneticRatio = 42.577478518e6; %[Hz⋅T^−1]
-    k_traj = traj.k_trajectory;
+    k_traj = traj.k_trajectory; %[mm^-1]
     
     %get the furthest k space position
-    k_furthest_start = max( abs( [real(k_traj(:,1)); imag(k_traj(:,1)) ]));
+    k_furthest_start = max( abs( [real(k_traj(:,1)); imag(k_traj(:,1)) ])); %[mm^-1]
 
     %time to ramp to furthest k space starting point.
     %TODO: add slew rate for ramping
-    max_time = k_furthest_start/(gyromagneticRatio*gMax);
+    max_time = k_furthest_start/(gyromagneticRatio*2*pi*gMax);
 
 
     %add enough space in trajectory to accountn for ramping to first position
     %gradientTraj(excite, i).time is the time to get from i-1 to k(excite,i)
     %gradientTraj(excite, i).G is the gradient applied during "time" to get to k(excite, i)
-    gradientTraj = struct('G', cell(size(k_traj)), 'time', cell(size(k_traj)));
+    gradientTraj = complex(zeros(size(k_traj)),0);
+    gradientTraj(1) = 0 + 1i;
+    gradientTime = zeros(size(k_traj));
 
     %Calculate gradient trajectory
-    for excite = 1:size(k_traj, 1)
+    for excite = size(k_traj, 1):-1:1
         
         %Initalize the previous k space point
         k_prev = 0;
@@ -43,7 +45,7 @@ function [gradientTraj] = MRSI_load_ktrajectory(traj, gMax)
             if k == 1
                 %Get the gradient to get to the first k position over max
                 %timie
-                gradient_diff = k_diff/(max_time * gyromagneticRatio);
+                gradient_diff = k_diff/(max_time * gyromagneticRatio * 2 * pi);
                 if(isnan(gradient_diff))
                     gradient_diff = 0;
                 end
@@ -54,7 +56,7 @@ function [gradientTraj] = MRSI_load_ktrajectory(traj, gMax)
                 grad_y = imag(gradient_diff);
             else
                 %Calculate the gradient from the difference (Numerical derrivative)
-                gradient_diff = k_diff/(dwellTime * gyromagneticRatio);
+                gradient_diff = k_diff/(dwellTime * gyromagneticRatio * 2 * pi);
                 
                 %set default calculated variables
                 grad_x = real(gradient_diff);
@@ -101,11 +103,9 @@ function [gradientTraj] = MRSI_load_ktrajectory(traj, gMax)
             end
             
             %Create struct from set variables
-            gradient_struct.time = time;
-            gradient_struct.G = grad_x + 1i*grad_y;
-            
-            %add created struct to array
-            gradientTraj(excite, k) = gradient_struct;
+            gradientTime(excite, k) = time;
+            gradientTraj(excite, k) = grad_x + 1i*grad_y;
+
             %set k_prev to the current k space position
             k_prev = k_traj(excite, k);
         end

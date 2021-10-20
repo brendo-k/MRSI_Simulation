@@ -17,13 +17,13 @@ function [obj] = cartMRSI(par)
     %calculating the same image parameters as the default parameters in Rosette.m 
 
     %updating local variables from parameters
-    Fov = par.Fov; %[m, m]
-    deltaFovX = Fov(1)/par.imageSize(1); %[m]
-    deltaFovY = Fov(2)/par.imageSize(2); %[m]
-    deltaKX = 1/Fov(1); %[m^-1]
-    deltaKY = 1/Fov(2); %[m^-1]
-    FovKX = 1/deltaFovX; %[m^-1]
-    FovKY = 1/deltaFovY; %[m^-1]
+    Fov = par.Fov; %[mm, mm]
+    deltaFovX = Fov(1)/par.imageSize(1); %[mm]
+    deltaFovY = Fov(2)/par.imageSize(2); %[mm]
+    deltaKX = 1/Fov(1); %[mm^-1]
+    deltaKY = 1/Fov(2); %[mm^-1]
+    FovKX = 1/deltaFovX; %[mm^-1]
+    FovKY = 1/deltaFovY; %[mm^-1]
     dwellTime = 1/par.sw; %[s]
     readOutTime = dwellTime*(par.imageSize(3)-1); %[s]
     scanTime = readOutTime*par.imageSize(1)*par.imageSize(2);
@@ -48,7 +48,7 @@ function [obj] = cartMRSI(par)
     t = 0:dwellTime: dwellTime*par.imageSize(3)-dwellTime;
     
     %add plus one because the zeroth point is counted
-    traj = repmat(traj, [1,int32(readOutTime/dwellTime + 1)]);
+    traj = repmat(traj, [1,par.imageSize(3)]);
     
     obj = Trajectory('cartesian', traj, par.imageSize, Fov, dwellTime, par.sw, t,1);
 

@@ -1,9 +1,9 @@
 %load spins from binary file
-
-function spins = load_spins(file_name, phantom, m)
+% 
+function spins = load_spins(phantom, m)
 
 %open file 
-file_id = fopen(file_name);
+file_id = fopen(phantom.file{m});
 %read file as single data type and cast to single
 spins = fread(file_id,inf, 'single=>single');
 %close file and delete
