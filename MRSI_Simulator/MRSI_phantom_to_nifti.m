@@ -38,8 +38,8 @@ function V = MRSI_phantom_to_nifti(phantom, filename, met)
     %pixdim: dimensions of a pixel in x,y,z directions. pixdim[0] is used
     %for the direction of the affine transformation
     pixdim = zeros(8,1);
-    delta_x = phantom.y(2) - phantom.y(1);
-    delta_y = phantom.x(2) - phantom.x(1);
+    delta_x = phantom.x(2) - phantom.x(1);
+    delta_y = phantom.y(2) - phantom.y(1);
     pixdim(1:3) = [-1, delta_x*1000, delta_y*1000];
     fwrite(f, pixdim, 'single');
     

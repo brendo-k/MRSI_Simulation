@@ -10,6 +10,7 @@ function out = MRSI_convert(fid, traj, B0)
     out.dims.t = 1;
     out.dims.x = 2;
     out.dims.y = 3;
+    out.dims.z = 0;
     out.dims.averages = 0;
     out.dims.coils = 0;
     out.Bo = B0;
@@ -25,6 +26,14 @@ function out = MRSI_convert(fid, traj, B0)
     out.deltaY = traj.pixel_width.y; %[mm]
     out.deltaZ = 1;
     out.imageOrigin = [0 0 0];
+    out.affine_matrix = [out.deltaX, 0         , 0         , 0;...
+                         0         , -out.deltaY, 0        , 0;...
+                         0         , 0         , out.deltaZ, 0;...
+                         0         , 0         , 0         , 1];
+    out.affine_matrix = out.affine_matrix * [1, 0, 0, -out.fovX/2;...
+                                             0, 1, 0, out.fovY/2;...
+                                             0, 0, 1, -out.fovZ/2;...
+                                             0, 0, 0 , 1];
 
 
     %FILLING IN THE FLAGS

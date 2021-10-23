@@ -11,23 +11,26 @@ end
     lipids = load('Lip.mat');
     %Load maps
     proj = currentProject;
-    csf = spm_vol(char(append(proj.RootFolder, '/mni_icbm152_nlin_sym_09a/mni_icbm152_csf_tal_nlin_sym_09a.nii')));
     wm = spm_vol(char(append(proj.RootFolder, '/MNI152_2mm/wmMNI152_T1_2mm_brain.nii')));
     gm = spm_vol(char(append(proj.RootFolder, '/MNI152_2mm/gmMNI152_T1_2mm_brain.nii')));
+    pd = spm_vol(char(append(proj.RootFolder, '/MNI152_2mm/pdMNI152_T1_2mm_brain.nii')));
+    skull = spm_vol(char(append(proj.RootFolder, '/MNI152_2mm/MNI152_T1_2mm_skull.nii')));
 
     %first dimension: sagital plane (x)
     %second dimension: coronal plane (y)
     %last dimension: transverse plane (z)
-    [phantom.csf, phantom.csf_mat] = spm_read_vols(csf);
     [phantom.wm, phantom.wm_mat] = spm_read_vols(wm);
     [phantom.gm, phantom.gm_mat] = spm_read_vols(gm);
+    [phantom.pd, phantom.pd_mat] = spm_read_vols(pd);
+    [phantom.skull, phantom.skull_mat] = spm_read_vols(skull);
     
     %permute to y dimension to be first. (Follows MATLAB's image dimension
     %order). Flip first dimension to have front of head first. (ie. if
     %plotted using imagesc() the front of the brain will be at the top)
-    phantom.csf = flip(permute(phantom.csf, [2,1,3]), 1);
     phantom.gm = flip(permute(phantom.gm, [2,1,3]), 1);
     phantom.wm = flip(permute(phantom.wm, [2,1,3]), 1);
+    phantom.pd = flip(permute(phantom.pd, [2,1,3]), 1);
+    phantom.skull = flip(permute(phantom.skull, [2,1,3]), 1);
     
     if(slice > size(phantom.gm,3))
         error('slice index is to big')
@@ -127,9 +130,15 @@ end
                 end
                 idx = strcmp(conc_labels, name);
                 %scale each concentration by the intensity of the mni atlas
-                conc = wm_conc(idx)*phantom.wm(y,x,slice) + gm_conc(idx)*phantom.gm(y,x,slice);
+                if(strcmp(name, 'H2O'))
+                    conc = phantom.pd(y,x,slice);
+                elseif(strcmp(name, 'Lipids'))
+                    conc = phantom.skull(y,x,slice);
+                else
+                    conc = wm_conc(idx)*phantom.wm(y,x,slice) + gm_conc(idx)*phantom.gm(y,x,slice);
+                end
                 vox_met.conc = conc;
-                
+
                 %add to met array
                 met_arr{y,x}(counter) = vox_met;
                 counter = counter + 1;
@@ -137,6 +146,8 @@ end
             end
         end
     end
+    
+
 
     T2_star = zeros(length(metabolites), 1);
     for m = 1:length(metabolites)

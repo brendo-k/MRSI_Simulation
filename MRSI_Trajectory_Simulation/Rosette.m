@@ -17,12 +17,11 @@
 % OUTPUTS:
 % obj = Trajectory obj
 
-function [obj] = Rosette(sw, Fov, imageSize, file_path)
+function [obj] = Rosette(sw, Fov, imageSize)
     arguments
-        sw (1,1) double = 2500
+        sw (1,1) double = 2000
         Fov (1,2) double = [200,200]
-        imageSize (1,3) double = [16, 16, 1024]
-        file_path (1,:) char = ""
+        imageSize (1,3) double = [16, 16, 512]
     end
 
     %initalize constant
@@ -52,6 +51,7 @@ function [obj] = Rosette(sw, Fov, imageSize, file_path)
     traj = complex(zeros(N_AngleInts, length(t)), 0);
     %Rosette trajectory formulat from shirda paper
     traj(1,:) = kMax*sin(omega1*t).*exp(1i*omega2*t);
+
 
     %creating rosette trajectory in k space
     for rotation = 1:N_AngleInts

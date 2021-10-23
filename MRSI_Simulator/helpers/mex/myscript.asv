@@ -1,0 +1,13 @@
+% my_script.m
+clear all
+tic
+result = zeros(64, 64,3000, 'like', 1i);
+toc
+result(1) = 0 + 1i;
+%%assign real values to a real vector
+disp('assign real values to a real vector');
+idx = get_diag_index(64, 3000);
+exp = repmat(1i, [64,3000]);
+tic
+result(idx(:)) = exp;
+toc

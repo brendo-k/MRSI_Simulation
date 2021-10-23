@@ -14,6 +14,7 @@ if(contains(traj.name, 'cart', 'IgnoreCase', 1))
         [x, y] = ind2sub(traj.imageSize(1:2),readout);
         S_remap(:, x, y) = S(readout,:);
     end
+    S_remap = permute(S_remap, [1,3,2]);
 else
     S_remap = permute(S, [2, 1]);
 end

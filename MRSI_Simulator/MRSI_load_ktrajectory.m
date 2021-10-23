@@ -22,7 +22,7 @@ function [gradientTraj, gradientTime] = MRSI_load_ktrajectory(traj, gMax)
 
     %time to ramp to furthest k space starting point.
     %TODO: add slew rate for ramping
-    max_time = k_furthest_start/(gyromagneticRatio*2*pi*gMax);
+    max_time = k_furthest_start/(gyromagneticRatio*gMax);
 
 
     %add enough space in trajectory to accountn for ramping to first position
@@ -45,7 +45,7 @@ function [gradientTraj, gradientTime] = MRSI_load_ktrajectory(traj, gMax)
             if k == 1
                 %Get the gradient to get to the first k position over max
                 %timie
-                gradient_diff = k_diff/(max_time * gyromagneticRatio * 2 * pi);
+                gradient_diff = k_diff/(max_time * gyromagneticRatio);
                 if(isnan(gradient_diff))
                     gradient_diff = 0;
                 end
@@ -56,7 +56,7 @@ function [gradientTraj, gradientTime] = MRSI_load_ktrajectory(traj, gMax)
                 grad_y = imag(gradient_diff);
             else
                 %Calculate the gradient from the difference (Numerical derrivative)
-                gradient_diff = k_diff/(dwellTime * gyromagneticRatio * 2 * pi);
+                gradient_diff = k_diff/(dwellTime * gyromagneticRatio);
                 
                 %set default calculated variables
                 grad_x = real(gradient_diff);

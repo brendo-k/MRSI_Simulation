@@ -58,7 +58,7 @@ for m = 1:length(phantom.met)
     fprintf("simulating metabolite %s\n", phantom.met_names{m})
     scale = 2^(2-phantom.met(m).nspins);
 
-    trc = phantom.met(m).Fx + 1i*phantom.met(m).Fy;
+    trc = single(phantom.met(m).Fx + 1i*phantom.met(m).Fy);
     met = phantom.met(m);
     
     spins = permute(spins, [3,4,1,2]);
@@ -70,7 +70,7 @@ for m = 1:length(phantom.met)
     spins =spins(:,:, idx);
 
     met_signal = complex(zeros(size(gradient, 1,2)), 0);
-
+    traj_name = traj.name;
     ticBytes(gcp)
     parfor excite=1:size(gradient,1)
         tic
@@ -86,8 +86,10 @@ for m = 1:length(phantom.met)
             grad_matrix = real(gradient(excite,k))*phan_x + imag(gradient(excite,k))*phan_y + B0;
             
             %Calculate hamiltonians
-            [H, H_inv, is_diag] = calculate_H(met, grad_matrix, gradientTime(excite,k), B0, idx);
-            
+            if(~(strcmp(traj_name, 'cartesian') && k ~= 1))
+                [H, H_inv, is_diag] = calculate_H(met, grad_matrix, gradientTime(excite,k), B0, idx);
+            end
+
             if(is_diag)
                 par_spins = par_spins.*reshape(H, 1, size(H,1), size(H,2));
                 par_spins = par_spins.*reshape(H_inv, size(H,1), 1, size(H,2));
