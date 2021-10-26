@@ -68,10 +68,13 @@ for m = 1:length(phantom.met)
     %excite_spins = gpuArray(excite_spins);
     idx = any(spins, [1,2]);
     spins =spins(:,:, idx);
+    conc = phantom.conc(:, :, m);
+    conc = conc(idx);
+    spins = spins.*conc;
 
     met_signal = complex(zeros(size(gradient, 1,2)), 0);
     traj_name = traj.name;
-    ticBytes(gcp)
+    %ticBytes(gcp)
     parfor excite=1:size(gradient,1)
         tic
         fprintf("simulating TR number %d\n", excite)
@@ -86,17 +89,19 @@ for m = 1:length(phantom.met)
             grad_matrix = real(gradient(excite,k))*phan_x + imag(gradient(excite,k))*phan_y + B0;
             
             %Calculate hamiltonians
-            if(~(strcmp(traj_name, 'cartesian') && k ~= 1))
+            if(~strcmp(traj_name, 'cartesian') || k <= 2)
                 [H, H_inv, is_diag] = calculate_H(met, grad_matrix, gradientTime(excite,k), B0, idx);
             end
 
             if(is_diag)
-                par_spins = par_spins.*reshape(H, 1, size(H,1), size(H,2));
-                par_spins = par_spins.*reshape(H_inv, size(H,1), 1, size(H,2));
+                H_temp = reshape(H, 1, size(H,1), size(H,2));
+                H_inv_temp = reshape(H_inv, size(H,1), 1, size(H,2));
+                par_spins = par_spins.*H_temp;
+                par_spins = par_spins.*H_inv_temp;
             else
                 par_spins = pagemtimes(pagemtimes(H_inv, par_spins), H);
             end
-
+            
             %save to signal
             met_signal(excite, k) = readout(par_spins, trc, scale);
         end
@@ -104,11 +109,14 @@ for m = 1:length(phantom.met)
         fprintf("finished excitation number %d, took %f minutes\n", excite, met_time/60)
     end 
     
-    tocBytes(gcp)
+    %tocBytes(gcp)
     t = 0:traj.dwellTime:traj.dwellTime*(size(traj.k_trajectory, 2)-1);
     S(m,:, :) = met_signal .* exp(-t/phantom.T2(m));
 end
+%add up all the metabolite signals.
 S = sum(S, 1);
+%Change the rotation direction
+S = conj(S);
 
 S = MRSI_regrid(S, traj);
 %convert to fid-a structure
@@ -122,7 +130,10 @@ end
 %get the readout from all voxels for metabolite m
 function phantom_sig = readout(spins, Trc, scale)
 traced_spins = pagemtimes(spins, Trc);
-sum_sig = sum(traced_spins, 3);
+%diag_idx = get_diag_index(size(spins,1), size(spins,3));
+%phantom_sig = sum(traced_spins(diag_idx), 'all');
+%phantom_sig = phantom_sig * scale;
+sum_sig = sum(traced_spins, 'all');
 phantom_sig = scale*trace(sum_sig);
 end
 

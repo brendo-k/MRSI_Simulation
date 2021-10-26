@@ -4,7 +4,7 @@ arguments
     slice (1,1) double {mustBePositive}
     mets (:,1) struct = [];
     T2_met (1,1) double = 0.1;
-    T2_lip (1,1) double = 0.015;
+    T2_lip (1,1) double = 0.001;
     MemoryOptions.use_disc (1,1) logical = 0
 end
     spins = load('spinSystems.mat');

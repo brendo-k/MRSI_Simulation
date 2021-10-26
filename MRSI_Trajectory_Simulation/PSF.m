@@ -24,8 +24,8 @@ function [lineWidth,leakage] = PSF(trajectory)
     k_traj = trajectory.k_trajectory(:, 1:trajectory.spatialPoints);
     k_space_trajectory = [real(k_traj(:)), imag(k_traj(:))];
     
-    x_mesh = trajectory.spacial_coordinates.x(1):0.001:trajectory.spacial_coordinates.x(end);
-    y_mesh = trajectory.spacial_coordinates.y(1):0.001:trajectory.spacial_coordinates.x(end);
+    x_mesh = linspace(trajectory.spacial_coordinates.x(1),trajectory.spacial_coordinates.x(end),100);
+    y_mesh = linspace(trajectory.spacial_coordinates.y(1),trajectory.spacial_coordinates.x(end),100);
     [x,y] = meshgrid(x_mesh, y_mesh);
     pointSpreadCoordinates(:,:) = [x(:), y(:)];
     
