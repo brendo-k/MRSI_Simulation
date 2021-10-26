@@ -8,7 +8,6 @@ arguments
     MemoryOptions.use_disc (1,1) logical = 0
 end
     spins = load('spinSystems.mat');
-    lipids = load('Lip.mat');
     %Load maps
     proj = currentProject;
     wm = spm_vol(char(append(proj.RootFolder, '/MNI152_2mm/wmMNI152_T1_2mm_brain.nii')));
