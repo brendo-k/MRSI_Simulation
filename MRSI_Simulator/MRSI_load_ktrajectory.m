@@ -8,106 +8,56 @@
 % Input:
 % traj: k_space trajectory
 % gMax: gradient max [mT/m] -> T/mm
-function [gradientTraj, gradientTime] = MRSI_load_ktrajectory(traj, gMax) 
+function [gradientTraj, gradientTime] = MRSI_load_ktrajectory(traj, gMax)
 
     dwellTime = traj.dwellTime; %[s]
     gMax = gMax/(10^6); %[T/mm]
-    
+
     %gyromagnetic for H
-    gyromagneticRatio = 42.577478518e6; %[Hz⋅T^−1]
-    k_traj = traj.k_trajectory; %[mm^-1]
-    
+    gamma = 42.577478518e6; %[Hz⋅T^−1]
+    %dimension is TR, trajectoryPoints
+    kSpaceTrajectory = traj.k_trajectory; %[mm^-1]
+
+    firstKSpacePoint = [real(kSpaceTrajectory(:, 1)); imag(kSpaceTrajectory(:, 1))];
     %get the furthest k space position
-    k_furthest_start = max( abs( [real(k_traj(:,1)); imag(k_traj(:,1)) ])); %[mm^-1]
-
-    %time to ramp to furthest k space starting point.
-    %TODO: add slew rate for ramping
-    max_time = k_furthest_start/(gyromagneticRatio*gMax);
-
+    k_furthest_start = max(abs(firstKSpacePoint)); %[mm^-1]
+    %time to get to furthest k space starting point.
+    max_time = k_furthest_start/(gamma*gMax);
 
     %add enough space in trajectory to accountn for ramping to first position
     %gradientTraj(excite, i).time is the time to get from i-1 to k(excite,i)
     %gradientTraj(excite, i).G is the gradient applied during "time" to get to k(excite, i)
-    gradientTraj = complex(zeros(size(k_traj)),0);
+    gradientTraj = complex(zeros(size(kSpaceTrajectory)), 0);
     gradientTraj(1) = 0 + 1i;
-    gradientTime = zeros(size(k_traj));
+    gradientTime = zeros(size(kSpaceTrajectory));
 
     %Calculate gradient trajectory
-    for excite = size(k_traj, 1):-1:1
-        
+    for excite = size(kSpaceTrajectory, 1):-1:1
         %Initalize the previous k space point
-        k_prev = 0;
-        for k = 1:size(k_traj, 2)
+        previousKSpacePosition = 0;
+        for k = 1:size(kSpaceTrajectory, 2)
             %Get the difference between two k space points
-            k_diff = k_traj(excite, k) - k_prev;
-
-            %Set all first k space positions to the same echo time.
+            k_diff = kSpaceTrajectory(excite, k) - previousKSpacePosition;
             if k == 1
-                %Get the gradient to get to the first k position over max
-                %timie
-                gradient_diff = k_diff/(max_time * gyromagneticRatio);
-                if(isnan(gradient_diff))
-                    gradient_diff = 0;
-                end
-                
-                %set variable to be added to the struct
+                gradient = calculateGradient(k_diff, max_time, gamma);
                 time = max_time;
-                grad_x = real(gradient_diff);
-                grad_y = imag(gradient_diff);
             else
                 %Calculate the gradient from the difference (Numerical derrivative)
-                gradient_diff = k_diff/(dwellTime * gyromagneticRatio);
-                
-                %set default calculated variables
-                grad_x = real(gradient_diff);
-                grad_y = imag(gradient_diff);
-                time_x = dwellTime;
-                time_y = dwellTime;
-                
-                %If x gradient component is larger than gMax. 
-                %Calculate how to get to same position within the contraints of gMax
-                if(grad_x >= gMax || grad_x <= -gMax)
-                    
-                    %Get the time to get to next k posion at gMax
-                    time_x = abs(grad_x)*dwellTime/gMax;
-                    %set gradient to be positive or negative gmax
-                    if(grad_x < 0)
-                        grad_x = -gMax;
-                    else
-                        grad_x = gMax;
-                    end
-                end
-                
-                %If gradient is larger than gMax calculate how to get to same position with the contraints of gMax
-                if(grad_y >= gMax || grad_y <= -gMax)
-                    %Get the time to get to next k posion at gMax
-                    time_y = abs(grad_y)*dwellTime/gMax;
-                    %set grad to be positive or negative gmax
-                    if(grad_y < 0)
-                        grad_y = -gMax;
-                    else
-                        grad_y = gMax;
-                    end
-                end
-                
-                %calculate the gradient for shorter time if it was applied
-                %over the longer time period.
-                if(time_x < time_y)
-                    grad_x = time_x*grad_x/time_y;
-                elseif(time_y < time_x)
-                    grad_y = time_y*grad_y/time_x;
-                end
-                
-                %set the time to be the largest time
-                time = max(time_x, time_y);
+                gradient = calculateGradient(k_diff, dwellTime, gamma);
+                time = dwellTime;
             end
-            
+
             %Create struct from set variables
             gradientTime(excite, k) = time;
-            gradientTraj(excite, k) = grad_x + 1i*grad_y;
+            gradientTraj(excite, k) = gradient;
 
             %set k_prev to the current k space position
-            k_prev = k_traj(excite, k);
+            previousKSpacePosition = kSpaceTrajectory(excite, k);
         end
     end
+end
+
+function [gradient] = calculateGradient(k_diff, dwellTime, gamma)
+    %Calculate the gradient from the difference (Numerical derrivative)
+    gradient = k_diff/(dwellTime * gamma);
 end

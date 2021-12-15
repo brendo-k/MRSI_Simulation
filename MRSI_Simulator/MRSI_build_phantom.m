@@ -34,55 +34,50 @@ end
 %initalize metabolites to be 46 long
 counter = 1;
 
-
+allMets = {};
 %get a list of all the metabolites that exist in the phantom
 bool_metabolites = zeros(size(met,1), size(met,2), 46, 'logical');
 for y = 1:size(met, 1) 
     for x = 1:size(met, 2)
         for m = 1:length(met{y,x})
-            if(exist('all_mets', 'var'))
-            %get list of names already found
-                names = {all_mets.name};
-            else
-                names = '';
-            end
+            names = cellfun(@(allMets) allMets.name, allMets, 'UniformOutput', false);
             %if met name is not in list, add to list
-            if(~strcmp(names, met{y,x}(m).name))
-                all_mets(counter) = met{y,x}(m);
+            if(isempty(names) || ~any(strcmp(names, met{y,x}(m).name)))
+                allMets{counter} = met{y,x}(m);
 
-                all_mets(counter).shifts = all_mets(counter).shifts - 4.65;
+                allMets{counter}.shifts = allMets{counter}.shifts - 4.65;
                 counter = counter + 1;
             end
-            names = {all_mets.name};
+            
+            metPosition = strcmp(names, met{y, x}(m).name);
+            if(isempty(metPosition))
+                metPosition = counter - 1;
+            end
             %logical array for position of metabolites
-            bool_metabolites(y,x,strcmp(names, met{y,x}(m).name)) = 1;
+            bool_metabolites(y, x, metPosition) = 1;
         end
     end
 end
 
-%remove empty spaces in array
-for m = 1:length(all_mets)
-    if(strcmp(all_mets(m).name, ''))
-        all_mets(m:end) = [];
-        bool_metabolites(:,:,m:end) = [];
-        break;
-    end
+if(isempty(allMets))
+    error('MRSISimulator:buildPhantom', 'No metabolites found in met %s', '')
 end
 
 if(length(T2_star) == 1)
-    T2_star = repmat(T2_star, [length(all_mets), 1]);
+    T2_star = repmat(T2_star, [length(allMets), 1]);
 end
+
 %loop through all metabolites and get hamiltonian and density matrix
-for m = length(all_mets):-1:1
-    [phantom.met(m), d] = sim_Hamiltonian(all_mets(m), b0);
+for m = length(allMets):-1:1
+    [phantom.met(m), d] = sim_Hamiltonian(allMets{m}, b0);
     phantom.d{m} = single(d{1});
-    phantom.met_names{m} = all_mets(m).name;
-    phantom.spins(m) = {zeros(size(met, 1), size(met, 2), size(d{1}, 1), size(d{1}, 2), 'single')};
+    phantom.met_names{m} = allMets{m}.name;
+    phantom.spins{m} = zeros(size(d{1}, 1), size(d{1}, 2), size(met, 1), size(met, 2), 'single');
     phantom.T2(m) = T2_star(m);
 end
-phantom.conc = zeros([size(met, [1,2]), length(all_mets)]);
+phantom.conc = zeros([size(met, [1,2]), length(allMets)]);
 %initalize phantom with empty structs
-for m = 1:length(all_mets)
+for m = 1:length(allMets)
     for y = 1:size(bool_metabolites,1)
         for x = 1:size(bool_metabolites,2)
             if(bool_metabolites(y,x,m))
@@ -95,11 +90,11 @@ for m = 1:length(all_mets)
                 if(isfield(cur_met, 'conc'))
                     
                     %multiply density matrix by concentration 
-                    phantom.spins{m}(y,x,:,:) = phantom.d{m}*met{y,x}(idx).conc;
+                    phantom.spins{m}(:, :, y, x) = phantom.d{m}*met{y,x}(idx).conc;
                     phantom.conc(y,x,m) = met{y,x}(idx).conc;
                 else
                     %no concentration, assume uniform concentration
-                    phantom.spins{m}(y,x,:,:) = phantom.d{m};
+                    phantom.spins{m}(:, :, y, x) = phantom.d{m};
                     phantom.conc(y,x,m) = 1;
                 end
             end
@@ -138,7 +133,7 @@ phantom.x = phan_x;
 phantom.y = phan_y;
 
 %if mets are empty fill with template values
-if(isempty(all_mets))
+if(isempty(allMets))
     phantom.met = [];
     phantom.d ={0};
     phantom.met_names = {''};

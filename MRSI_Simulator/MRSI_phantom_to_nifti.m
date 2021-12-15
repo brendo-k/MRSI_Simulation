@@ -1,6 +1,5 @@
 function V = MRSI_phantom_to_nifti(phantom, filename, met)
-    met = upper(met);
-    if(~contains(phantom.met_names, met))
+    if(~contains(phantom.met_names, met, 'IgnoreCase',true))
         error('input metabolite name does not exist in the phantom structure')
     end
 
@@ -14,8 +13,7 @@ function V = MRSI_phantom_to_nifti(phantom, filename, met)
     fwrite(f, zeros(36,1), 'int8');
     
     %get the dimension sizes
-    phantom_size = size(phantom.spins{1}, [1,2]);
-    phantom_size = flip(phantom_size, 2);
+    phantom_size = [length(phantom.x), length(phantom.y)];
     phantom_size = [2, phantom_size];
     
     %make sure dim is of length 8
@@ -116,14 +114,13 @@ function V = MRSI_phantom_to_nifti(phantom, filename, met)
     [met_prefix] = regexp(phantom_met_names, '^([a-zA-Z1-9]*)_?', 'tokens');
     met_prefix = [met_prefix{:}];
     met_prefix = [met_prefix{:}];
-    idx = strcmp(met_prefix, met);
+    idx = strcmpi(met_prefix, met);
     
     signal = zeros(length(phantom.x)*length(phantom.y),1);
     for y = length(phantom.y):-1:1
         for x = 1:length(phantom.x)
             sig = phantom.conc(y,x,idx);
-            sig = sum(sig,'all');
-            signal(length(phantom.x)*(length(phantom.y) - y) + x) = sig;
+            signal(length(phantom.x)*(length(phantom.y) - y) + x) = sig(1);
         end
     end
 

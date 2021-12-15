@@ -62,13 +62,11 @@ elseif(strcmp(ArgumentOptions.argument_type, 'matrix'))
 end
 end
 
-function spins = calculate(spins, HExcite, inv_HExcite)
-phan_size = size(spins, [1,2]);
-spins = permute(spins, [3,4,1,2]);
-spins = reshape(spins, size(spins,1), size(spins,2), []);
-spins = pagemtimes(pagemtimes(inv_HExcite,spins), HExcite);
-spins = reshape(spins, size(spins,1), size(spins,2), phan_size(1), phan_size(2));
-spins = permute(spins, [3,4,1,2]);
+function spins = calculate(spins, H, H_inv)
+    imageSize = size(spins, [3, 4]);
+    spins = reshape(spins, size(spins, 1), size(spins, 2), []);
+    spins = pagemtimes(pagemtimes(H_inv,spins), H);
+    spins = reshape(spins, [size(spins, [1, 2]) imageSize]);
 end
 
 

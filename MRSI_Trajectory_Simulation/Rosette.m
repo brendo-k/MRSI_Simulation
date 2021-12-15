@@ -17,35 +17,54 @@
 % OUTPUTS:
 % obj = Trajectory obj
 
-function [obj] = Rosette(sw, Fov, imageSize)
+function [obj] = Rosette(sw, Fov, imageSize, parameters)
     arguments
         sw (1,1) double = 2000
         Fov (1,2) double = [200,200]
-        imageSize (1,3) double = [16, 16, 512]
+        imageSize (1,3) double = [20, 20, 512]
+        parameters.omega1 (1,1) double
+        parameters.adc_points (1,1) double
+        parameters.N_AngleInts (1,1) double
+        parameters.dwellTime (1,1) double
+        parameters.kMax (1,1) double
+        parameters.spacial_points (1,1) double
+        
     end
 
     %initalize constant
     gamma = 42.577478518e6;    
     
-    %get omega1 and omega2 from sw
-    omega1 = sw*pi;
-    omega2 = omega1;
-    %get kFov
-    kFov = imageSize(1)/Fov(1);
-    %get KMax
-    kMax = kFov/2;
-    %calculate gMax
-    gMax = kMax * max(omega1, omega2)/(gamma); %T/m
-  
-    %dwell time calculation
-    dwellTime = 1/(gamma*gMax*Fov(1));
-    spectral_points = (1/sw)/dwellTime;
-    dwellTime = (1/sw)/ceil(spectral_points);
-    %number of angular interleves (number of turns)
-    N_AngleInts = floor((pi*imageSize(1))/(sqrt(1+3*(omega2^2/omega1^2))));
-    
-    %get time vector
-    t = 0:dwellTime:(1/sw)*(imageSize(3) - dwellTime);
+    if(isempty(fieldnames(parameters)))
+        %get omega1 and omega2 from sw
+        omega1 = sw*pi;
+        omega2 = omega1;
+        %get kFov
+        kFov = imageSize(1)/Fov(1);
+        %get KMax
+        kMax = kFov/2;
+        %calculate gMax
+        gMax = kMax * max(omega1, omega2)/(gamma); %T/m
+
+        %dwell time calculation
+        dwellTime = 1/(gamma*gMax*Fov(1));
+        spectral_points =  (1/sw)/dwellTime;
+        dwellTime = (1/sw)/ceil(spectral_points);
+        %number of angular interleves (number of turns)
+        N_AngleInts = floor((pi*imageSize(1))/(sqrt(1+3*(omega2^2/omega1^2))));
+        
+        adc_points = (1/sw)*(imageSize(3) - dwellTime);
+        %get time vector
+        t = 0:dwellTime:adc_points;
+    else
+        omega1 = parameters.omega1;
+        omega2 = parameters.omega1;
+        kMax = parameters.kMax;
+        dwellTime = parameters.dwellTime;
+        N_AngleInts = parameters.N_AngleInts;
+        t = 0:dwellTime:dwellTime*(parameters.adc_points-1);
+        spectral_points =  (1/sw)/dwellTime;
+   
+    end
     
     %initalize array size
     traj = complex(zeros(N_AngleInts, length(t)), 0);

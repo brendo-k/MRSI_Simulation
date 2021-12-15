@@ -14,11 +14,11 @@ y = y / max(y);
 N = length(y);
 lev50 = 0.5;
 if y(1) < lev50                  % find index of center (max or min) of pulse
-    [garbage,centerindex]=max(y);
+    [~,centerindex]=max(y);
     Pol = +1;
     disp('Pulse Polarity = Positive')
 else
-    [garbage,centerindex]=min(y);
+    [~,centerindex]=min(y);
     Pol = -1;
     disp('Pulse Polarity = Negative')
 end
