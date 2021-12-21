@@ -16,192 +16,232 @@
 % Output:
 % out: FID-A MRSI object
 % voxel_sig: REDUNDANT, to be used for annimations. WORK IN PROGRESS
-function [out, voxel_sig] = MRSI_simulate(traj, phantom, gMax, B0, MemoryOptions)
-arguments
-    traj (1,1) Trajectory
-    phantom (:, :) struct
-    gMax (1,1) double = 30
-    B0 (1,1) double = 3
-    MemoryOptions.use_disc (1,1) logical = 0;
+function [out, spin_animation] = MRSI_simulate(traj, phantom, gMax, B0, B0_map, MemoryOptions, Debug)
+    arguments
+        traj (1,1) Trajectory
+        phantom (:, :) struct
+        gMax (1,1) double = 30
+        B0 (1,1) double = 3
+        B0_map (:, :) double = zeros(length(phantom.y), length(phantom.x));
+        MemoryOptions.use_disc (1,1) logical = 0;
+        Debug.plot_spins = 0;
+        Debug.spinEcho (1, 1) logical = false;
+    end
+    functionTimer = tic;
+
+    if(isempty(phantom.spins{1}))
+        MemoryOptions.use_disc = 1;
+    end
+
+    %Calculate gradient, k space, and spatical parameters
+    [gradient, gradientTime] = MRSI_load_ktrajectory(traj, gMax);
+    %Initalize array for signal readout
+    MRSISignal = zeros([length(phantom.met), size(gradient, [1, 2])]);
+    MRSISignal = complex(MRSISignal, 0);
+
+    isCartesian = false;
+    if(strcmp(traj.name, 'cartesian')); isCartesian = true; end
+    TE = 0.001;
+    %voxel_sig = complex(zeros(size(gradient,1), size(gradient, 2), x_phantom_size, y_phantom_size), 0);
+    for m = 1:length(phantom.met)
+        spins = getSpins(MemoryOptions, phantom, m);
+        spins = MRSI_excite(spins, 90, 'y', 'argument_type', 'matrix', 'F', phantom.met(m).Fy);
+        if(Debug.spinEcho)
+            spins = MRSI_evolve(spins, TE, 'argument_type', 'matrix', 'HAB', phantom.met(m).HAB);
+            spins = MRSI_excite(spins, 180, 'x', 'argument_type', 'matrix', 'F', phantom.met(m).Fx);
+        end
+        [spins, nonZeroIndex] = vectorizeSpins(spins);
+        nonZeroIndex = squeeze(nonZeroIndex);
+        fprintf("simulating metabolite %s\n", phantom.met_names{m})
+
+        met = phantom.met(m);
+
+        [trc, shieldingFactor, Iz, HAB] = getParameters(met, B0);
+        [xGrid, yGrid] = getVoxelCoordinateGrid(phantom);
+
+        metaboliteSignal = complex(zeros(size(gradient, 1, 2)), 0);
+
+        for trNumber = 1:size(gradient, 1)
+            trTimer = tic;
+            fprintf("simulating TR number %d\n", trNumber)
+
+            %set spins for this TR.
+            trSpins = spins;
+            for k=1:size(gradient, 2)
+                %get map of gradient for each voxel position in the grid
+                curGradient = gradient(trNumber, k);
+                gradientMap = getGradientMap(curGradient, xGrid, yGrid, B0_map);
+                gradientMap = gradientMap(nonZeroIndex);
+                %Calculate hamiltonians
+                timeStep = gradientTime(trNumber, k);
+                if(~isCartesian) || k <= 2
+                    gradientFrequency = getFrequencyFromGradients(gradientMap, shieldingFactor);
+                    HAB_effective = calculateNewHAB(Iz, gradientFrequency, HAB);
+                    
+                    [H, H_inv, is_diag] = calculateHamiltonians(HAB_effective, timeStep);
+                end
+                %Apply Hamiltonians
+                trSpins = applyHamiltonians(trSpins, H, H_inv, is_diag);
+                if(k == 1 && Debug.spinEcho)
+                    trSpins = MRSI_evolve(trSpins, TE - timeStep, 'argument_type', 'matrix', 'HAB', phantom.met(m).HAB);
+                end
+                %get signal
+                scale = 2 ^ (2 - met.nspins);
+                metaboliteSignal(trNumber, k) = getSignalFromSpins(trSpins, trc, scale);
+                
+            end
+            trExecutionTime = toc(trTimer);
+            fprintf("finished TR number %d, took %f minutes\n", ...
+                trNumber, trExecutionTime/60)
+        end
+        MRSISignal(m, :, :) = applyT2Decay(traj, metaboliteSignal, phantom, m);
+    end
+    %add up all the metabolite signals.
+    MRSISignal = sum(MRSISignal, 1);
+    %Change the rotation direction
+    MRSISignal = conj(MRSISignal);
+
+    MRSISignal = MRSI_regrid(MRSISignal, traj);
+    %convert to fid-a structure
+    out = MRSI_convert(MRSISignal, traj, B0);
+
+    total = toc(functionTimer);
+    fprintf('total run time is %f minutes\n', total/60)
 end
-func = tic;
 
-if(isempty(phantom.spins{1}))
-    MemoryOptions.use_disc = 1;
+
+%FUNCTION readout: readout the signal from the spin system from all voxels
+%get the readout from all voxels for metabolite m
+function scaledSignal = getSignalFromSpins(spins, Trc, scale)
+    
+    sumSpins = squeeze(sum(spins, 3));
+    signal = trace(sumSpins*Trc);
+    scaledSignal = scale*signal;
 end
 
 
-%Calculate gradient, k space, and spatical parameters
-[gradient, gradientTime] = MRSI_load_ktrajectory(traj, gMax);
+%FUNCTION calculate_H: create hamiltonians for each voxel based on gradient strength in
+function [H, H_inv, is_diag] = calculateHamiltonians(new_HAB, time)
+    %get the new HAB for each spin at each voxel.
 
-%create an matrix of x and y coordinates (used for speedup)
-[phan_x, phan_y] = meshgrid(single(phantom.x), single(phantom.y));
+    if(isdiag(new_HAB(:,:,1)))
+        m = size(new_HAB,1);
+        n = size(new_HAB,3);
+        diag_idx = get_diag_index(m,n);
 
-%Phantom size
+        HAB_evolve = new_HAB(diag_idx)*time*1i;
+        %initalize array for hamiltonian
 
-%Initalize array for signal readout
-S = zeros(length(phantom.met), size(traj.k_trajectory, 1),  size(traj.k_trajectory,2));
+        %get linearlized indexes of diagonals
+        %extract diagonals from stack of matrices from idx
+        exp_HAB = exp(HAB_evolve);
+        exp_conj = conj(exp_HAB);
+        H = exp_HAB;
+        H_inv = exp_conj;
+        is_diag = true;
+    else
+        HAB_evolve = new_HAB.*(1i*time);
+        H = complex(zeros(size(HAB_evolve)), 0);
+        for iMatrix = size(H, 3):-1:1
+            H(:, :, iMatrix) = expm(HAB_evolve(:, :, iMatrix));
+        end
+        H_inv = conj(H);
+        is_diag = false;
+    end
+end
 
-S = complex(S, 0);
-
-readout_length = size(gradient, 2);
 
 
-%voxel_sig = complex(zeros(size(gradient,1), size(gradient, 2), x_phantom_size, y_phantom_size), 0);
-for m = 1:length(phantom.met)
+function spins = getSpins(MemoryOptions, phantom, m)
     if(MemoryOptions.use_disc)
         spins = load_spins(phantom, m);
     else
         spins = phantom.spins{m};
     end
-    spins = MRSI_excite(spins, 90, 'y', 'argument_type', 'matrix', 'F', phantom.met(m).Fy);
-    fprintf("simulating metabolite %s\n", phantom.met_names{m})
-    scale = 2^(2-phantom.met(m).nspins);
+end
 
-    trc = single(phantom.met(m).Fx + 1i*phantom.met(m).Fy);
-    met = phantom.met(m);
-    
-    spins = permute(spins, [3,4,1,2]);
+
+
+function [spins, nonZeroIndex] = vectorizeSpins(spins)
     %vectorize the position dimension. Now excite spins is a stack of
     %matricies
     spins = reshape(spins, size(spins,1), size(spins,2), []);
-    %excite_spins = gpuArray(excite_spins);
-    idx = any(spins, [1,2]);
-    spins =spins(:,:, idx);
-    conc = phantom.conc(:, :, m);
-    conc = conc(idx);
-    spins = spins.*conc;
-
-    met_signal = complex(zeros(size(gradient, 1,2)), 0);
-    traj_name = traj.name;
-    %ticBytes(gcp)
-    parfor excite=1:size(gradient,1)
-        tic
-        fprintf("simulating TR number %d\n", excite)
-        %permute so the spin matrix is the first two dimensions and the
-        %second 2 are the voxel position dimensions
-
-        par_spins = spins;
-        for k=1:readout_length
-            
-            %apply gradient to x and y directions to form a gradient matrix.
-            %grad_matrix has gradient strength at the x and y position;
-            grad_matrix = real(gradient(excite,k))*phan_x + imag(gradient(excite,k))*phan_y + B0;
-            
-            %Calculate hamiltonians
-            if(~strcmp(traj_name, 'cartesian') || k <= 2)
-                [H, H_inv, is_diag] = calculate_H(met, grad_matrix, gradientTime(excite,k), B0, idx);
-            end
-
-            if(is_diag)
-                H_temp = reshape(H, 1, size(H,1), size(H,2));
-                H_inv_temp = reshape(H_inv, size(H,1), 1, size(H,2));
-                par_spins = par_spins.*H_temp;
-                par_spins = par_spins.*H_inv_temp;
-            else
-                par_spins = pagemtimes(pagemtimes(H_inv, par_spins), H);
-            end
-            
-            %save to signal
-            met_signal(excite, k) = readout(par_spins, trc, scale);
-        end
-        met_time = toc;
-        fprintf("finished excitation number %d, took %f minutes\n", excite, met_time/60)
-    end 
-    
-    %tocBytes(gcp)
-    t = 0:traj.dwellTime:traj.dwellTime*(size(traj.k_trajectory, 2)-1);
-    S(m,:, :) = met_signal .* exp(-t/phantom.T2(m));
-end
-%add up all the metabolite signals.
-S = sum(S, 1);
-%Change the rotation direction
-S = conj(S);
-
-S = MRSI_regrid(S, traj);
-%convert to fid-a structure
-out = MRSI_convert(S, traj, B0);
-
-total = toc(func);
-fprintf('total run time is %f minutes\n', total/60)
-end
-
-%FUNCTION readout: readout the signal from the spin system from all voxels
-%get the readout from all voxels for metabolite m
-function phantom_sig = readout(spins, Trc, scale)
-traced_spins = pagemtimes(spins, Trc);
-%diag_idx = get_diag_index(size(spins,1), size(spins,3));
-%phantom_sig = sum(traced_spins(diag_idx), 'all');
-%phantom_sig = phantom_sig * scale;
-sum_sig = sum(traced_spins, 'all');
-phantom_sig = scale*trace(sum_sig);
+    nonZeroIndex = any(spins, [1,2]);
+    spins = spins(:,:, nonZeroIndex);
 end
 
 
-%FUNCTION calculate_H: create hamiltonians for each voxel based on gradient strength in
-%grad matrix
-function [H, H_inv, is_diag] = calculate_H(met, gradients, time, B0, idx)
-%get the new HAB for each spin at each voxel.
-%This is derrived from ppm = ((v - v_ref)/v_ref)*10^6.
-%
-% (ppm*v_ref/10^6 + v_ref) = v. Where v_ref = (B0+G_x*x + G_y*y)*gamma
-%
-%(((ppm*v_ref/10^6 + v_ref)- v_ref_2)/v_ref_2)*10^6 = ((v-v_ref_2)/v_ref_2)*10^6 = dI_eff; where v_ref_2 = B0*gamma
-%
-%ppm_eff = (ppm*(B0+G*r)/10^6 + (B0+G*r) - B0)*10^6/B0
-%(gamma can be factored out)
 
-%gyromagnetic ratio
-gamma=42577000;  %[Hz/T]
-gradients = gradients(:);
-%compute the ppm_eff from above
-ppm_eff = (gradients.*met.shifts(1)/1e6 + gradients - B0)*1e6/B0;
-%remove empty voxels
-ppm_eff = ppm_eff(idx);
-ppm_diff = ppm_eff - met.shifts(1);
+function gradientMap = getGradientMap(gradient, xGrid, yGrid, B0Map)
+    %apply gradient to x and y directions to form a gradient matrix.
+    %grad_matrix has gradient strength at the x and y position;
+    currentGradientX = real(gradient);
+    currentGradientY = imag(gradient);
+    gradientMap = currentGradientX*xGrid + currentGradientY*yGrid;
+    gradientMap = gradientMap + B0Map;
+end
 
-%convert to rads/s
-shift_rads = ppm_diff*2*pi*gamma*B0/1e6;
-shift_rads = reshape(shift_rads, 1,length(shift_rads));
 
-diag_idx = get_diag_index(size(met.Fz,1),1);
-Fz = met.Fz(diag_idx);
-%diag_idx = get_diage_index(size(Fz,1), 1);
-Fz = repmat(Fz, [1,size(ppm_eff, 1)]); 
 
-%element wise multiplication of shift rads. 
-add_HAB = Fz.*shift_rads;
-
-%sum along the third dimension (stack of matricies) and add HABJonly. 
-%Final dimensions are (size of Hamiltonian along first dimension, size of
-%Hamiltonian along second, and length of vectorized voxel positions)
-new_HAB = repmat(single(met.HAB), [1,1,sum(idx)]);
-diag_idx = get_diag_index(size(new_HAB, 1), size(new_HAB,3));
-new_HAB(diag_idx) = new_HAB(diag_idx) + squeeze(add_HAB);
-if(isdiag(new_HAB(:,:,1)))
-    m = size(new_HAB,1);
-    n = size(new_HAB,3);
-    diag_idx = get_diag_index(m,n);
-
-    HAB = new_HAB(diag_idx).*(1i*time);
-    %initalize array for hamiltonian
-    
-    %get linearlized indexes of diagonals
-    %extract diagonals from stack of matrices from idx
-    exp_HAB = exp(HAB);
-    exp_conj = conj(exp_HAB);
-    H = exp_HAB;
-    H_inv = exp_conj;
-    is_diag = true;
-    
-else    
-    H = complex(zeros(size(new_HAB), 'like', single(1i)));
-    H(1) = 0 + 1i;
-    HAB = new_HAB.*(1i*time);
-    for i = size(H, 3):-1:1
-        H(:,:, i) = expm(HAB(:,:,i));
+function spins = applyHamiltonians(spins, H, Hinv, isDiag)
+    %if it is diagonal we can multiply matrix by a vector of
+    %diagonals instead of a matrix with diagonals.
+    if(isDiag)
+        HReshaped = reshape(H, 1, size(H,1), size(H,2));
+        HInvReshaped = reshape(Hinv, size(H,1), 1, size(H,2));
+        spins = spins.*HReshaped;
+        spins = spins.*HInvReshaped;
+    else
+        spins = pagemtimes(pagemtimes(Hinv, spins), H);
     end
-    H_inv = conj(H);
-    is_diag = false;
 end
+
+
+
+function signalWithDecay = applyT2Decay(traj, metaboliteSignal, phantom, m)
+    t = 0:traj.dwellTime:traj.dwellTime*(size(traj.k_trajectory, 2)-1);
+    signalWithDecay = metaboliteSignal .* exp(-t/phantom.T2(m));
+end
+
+
+function shieldingFactor = convertToShieldingFactor(shifts, b0)
+    gamma = 42577000;
+    spinHertz = shifts*(gamma*b0)/10e6 + gamma*b0;
+    shieldingFactor = spinHertz/(gamma*b0);
+end
+
+
+function [xGrid, yGrid] = getVoxelCoordinateGrid(phantom)
+    %create an matrix of x and y coordinates (used for speedup)
+    [xGrid, yGrid] = meshgrid(phantom.x, phantom.y);
+end
+
+function [trc, shieldingFactor, Iz, HAB] = getParameters(met, B0)
+    trc = met.Fx + 1i*met.Fy;
+    shifts = met.shifts;
+    shieldingFactor = convertToShieldingFactor(shifts, B0);
+    Iz = met.Iz;
+    HAB = met.HAB;
+end
+
+function offsetFrequency = getFrequencyFromGradients(gradients, shielding)
+    %gyromagnetic ratio
+    gamma=42577000;  %[(cycles/ms)/T]
+
+    %convert to rads/s
+    offsetFrequency = -gamma*gradients*2*pi*shielding';
+end
+
+%calculate new HAB. We can take advantage that HAB is already calculated. We
+%only need to add Iz_1*shift1Gradient + IZ_2*shift2Gradient
+function new_HAB = calculateNewHAB(Iz, gradientFrequency, HAB)
+    Iz = permute(Iz, [1,3,2]);
+    IzMultiplied = pagemtimes(Iz, gradientFrequency');
+    IzMultiplied = permute(IzMultiplied, [1,3,2]);
+    
+    %sum along the third dimension (stack of matricies) and add HABJonly.
+    %Final dimensions are (size of Hamiltonian along first dimension, size of
+    %Hamiltonian along second, and length of vectorized voxel positions)
+    new_HAB = repmat(HAB, [1, 1, size(IzMultiplied, 3)]);
+    new_HAB = new_HAB + IzMultiplied;
 end

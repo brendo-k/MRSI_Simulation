@@ -44,8 +44,8 @@ if(strcmp(ArgumentOptions.argument_type, 'struct'))
     end
 %MATRIX PASSED INTO STRUCTURE VARIABLE
 elseif(strcmp(ArgumentOptions.argument_type, 'matrix'))
-    Hevol = expm(ArgumentOptions.HAB*time*-1i);
-    inv_Hevol = expm(ArgumentOptions.HAB*time*1i);
+    Hevol = expm(ArgumentOptions.HAB*time*1i);
+    inv_Hevol = expm(ArgumentOptions.HAB*time*-1i);
     phantom = calculate(phantom, Hevol, inv_Hevol);
 end
 

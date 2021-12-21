@@ -14,38 +14,33 @@ function [gradientTraj, gradientTime] = MRSI_load_ktrajectory(traj, gMax)
     gMax = gMax/(10^6); %[T/mm]
 
     %gyromagnetic for H
-    gamma = 42.577478518e6; %[Hz⋅T^−1]
+    gamma = 42577000; %[Hz⋅T^−1]
     %dimension is TR, trajectoryPoints
     kSpaceTrajectory = traj.k_trajectory; %[mm^-1]
 
-    firstKSpacePoint = [real(kSpaceTrajectory(:, 1)); imag(kSpaceTrajectory(:, 1))];
-    %get the furthest k space position
-    k_furthest_start = max(abs(firstKSpacePoint)); %[mm^-1]
-    %time to get to furthest k space starting point.
-    max_time = k_furthest_start/(gamma*gMax);
-
-    %add enough space in trajectory to accountn for ramping to first position
-    %gradientTraj(excite, i).time is the time to get from i-1 to k(excite,i)
-    %gradientTraj(excite, i).G is the gradient applied during "time" to get to k(excite, i)
+    %initalize graident trajectory
     gradientTraj = complex(zeros(size(kSpaceTrajectory)), 0);
+    %setting the first point to be complex and looping from the end has a speed
+    %benefit for some reason.
     gradientTraj(1) = 0 + 1i;
+    %initalize time array
     gradientTime = zeros(size(kSpaceTrajectory));
 
-    %Calculate gradient trajectory
+    %Loop backwards trough excitations for computing speed
     for excite = size(kSpaceTrajectory, 1):-1:1
         %Initalize the previous k space point
         previousKSpacePosition = 0;
         for k = 1:size(kSpaceTrajectory, 2)
             %Get the difference between two k space points
             k_diff = kSpaceTrajectory(excite, k) - previousKSpacePosition;
-            if k == 1
-                gradient = calculateGradient(k_diff, max_time, gamma);
-                time = max_time;
-            else
-                %Calculate the gradient from the difference (Numerical derrivative)
-                gradient = calculateGradient(k_diff, dwellTime, gamma);
-                time = dwellTime;
+
+            %Calculate the gradient from the difference (Numerical derrivative)
+            gradient = calculateGradient(k_diff, dwellTime, gamma);
+            time = dwellTime;
+            if(gradient > gMax)
+                error('MRSI_load_trajectory:gMaxExceeded', '%d exceeds gMax', gradient)
             end
+            
 
             %Create struct from set variables
             gradientTime(excite, k) = time;
