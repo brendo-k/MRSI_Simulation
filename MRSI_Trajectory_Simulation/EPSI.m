@@ -15,43 +15,58 @@
 %           scanTime: Resulting scan time from trajectory. In seconds
 %           par: paramaters (same fields as above) used for EPSI simulation   
 
-function [obj] = EPSI(par)
-
-    if(nargin < 1)
-        par.sw = 2500; %[Hz]
-        par.Fov = [200, 200]; %FoV in m in the x and y directions
-        par.imageSize = [16, 16, 1024]; %voxels resolution in the x and y and spectral dimension
-    end
-    gamma = 42.577478518e6;
+function [trajectoryObject] = EPSI(spectralWidth, Fov, imageSize, spectralSize)
+arguments
+    spectralWidth (1, 1) double = 2000
+    Fov (2, 1) double = [200, 200]   % [y, x]
+    imageSize (2, 1) double = [8, 8] % [y, x]
+    spectralSize (1, 1) double = 512;
+end
+    numY = imageSize(1);
+    numX = imageSize(2);
+    fovY = Fov(1);
+    fovX = Fov(2);
+    
     %updating local variables from parameters
-    Fov = par.Fov;
-    deltaFovX = Fov(1)/par.imageSize(1); %[mm]
-    deltaFovY = Fov(2)/par.imageSize(2); %[mm]
-    deltaKX = 1/Fov(1); %[1/mm]
-    deltaKY = 1/Fov(2); %[1/mm]
+    deltaFovX = fovX/numX; %[mm]
+    deltaFovY = fovY/numY; %[mm]
+    deltaKX = 1/fovY; %[1/mm]
+    deltaKY = 1/fovX; %[1/mm]
     FovKX = 1/deltaFovX; %[1/mm]
     FovKY = 1/deltaFovY; %[1/mm]
-    dwellTime = (par.imageSize*2)/par.sw; %[s]
+    
+    spectralDwellTime = 1/spectralWidth;
+    adcDwellTime = spectralDwellTime/((numX - 1)*2); %[s]
     
     %calculating trajectory for each shot
-    kSpaceX = -FovKX/2 + deltaKX/2:deltaKX:FovKX/2 - deltaKX/2;
-    kSpaceY = -FovKY/2 + deltaKY/2:deltaKY:FovKY/2 - deltaKY/2;
+    kSpaceX = createCoordinates(FovKX/2, deltaKX);
+    kSpaceY = createCoordinates(FovKY/2, deltaKY);
     
     %initalize empty array for trajectory 
-    traj = zeros(par.imageSize(2), par.imageSize(1)*par.imageSize(3));
+    traj = zeros(numY, numX * spectralSize);
     
     %readout along the first dimension
-    for j = 1:par.imageSize(2)
+    for iTrajectory = 1:numY
         %multiple reads of the x axis
-        traj(j,:) = repmat(kSpaceX, [1,par.imageSize(3)]);
+        traj(iTrajectory, :) = repmat(kSpaceX, [1, spectralSize]);
         
         %add the corresponding y position
-        traj(j,:) = traj(j,:) + 1i*kSpaceY(j);
+        traj(iTrajectory,:) = traj(iTrajectory,:) + 1i*kSpaceY(iTrajectory);
     end
+    crossingTimeVector = 0:adcDwellTime:numX*adcDwellTime - adcDwellTime;
+    timeVector = zeros(numX * spectralSize, 1);
     
+    for iSpectralPoint = 1:spectralSize
+        indexStart = (iSpectralPoint - 1) * numX + 1;
+        indexEnd = iSpectralPoint * numX;
+
+        nextTimeVector = (iSpectralPoint - 1) * spectralDwellTime + crossingTimeVector;
+        timeVector(indexStart:indexEnd) = nextTimeVector;
+
+    end
     %Calculate scan time.
     %(dwelltime * imageSize * 2) is the time to get back to the same position
     %in k space which needs to be repeated equivalently to spectral points.
-    obj = Trajectory(traj, par.imageSize, par.Fov, dwellTime, ["x", "y"], sw);
+    trajectoryObject = Trajectory('EPSI', traj, imageSize, spectralSize, Fov, adcDwellTime, spectralWidth, timeVector, numX);
 end
     

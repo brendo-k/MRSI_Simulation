@@ -10,7 +10,7 @@ end
     spins = load('spinSystems.mat');
     lipids = load('Lip.mat');
 
-    [filePath, ~, ~] = fileparts(matlab.desktop.editor.getActiveFilename);    
+    [filePath, ~, ~] = fileparts(mfilename('fullpath'));    
     wm = spm_vol([filePath, '/..', '/MNI152_2mm/wmMNI152_T1_2mm_brain.nii']);
     gm = spm_vol([filePath, '/..', '/MNI152_2mm/gmMNI152_T1_2mm_brain.nii']);
     pd = spm_vol([filePath, '/..', '/MNI152_2mm/pdMNI152_T1_2mm_brain.nii']);

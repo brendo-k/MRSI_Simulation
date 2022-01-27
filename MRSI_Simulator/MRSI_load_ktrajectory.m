@@ -8,15 +8,15 @@
 % Input:
 % traj: k_space trajectory
 % gMax: gradient max [mT/m] -> T/mm
-function [gradientTraj, gradientTime] = MRSI_load_ktrajectory(traj, gMax)
+function [gradientTraj, gradientTime] = MRSI_load_ktrajectory(traj, gradientMax)
 
-    dwellTime = traj.dwellTime; %[s]
-    gMax = gMax/(10^6); %[T/mm]
+    gradientMax = gradientMax/(10^6); %[T/mm]
 
     %gyromagnetic for H
     gamma = 42577000; %[Hz⋅T^−1]
     %dimension is TR, trajectoryPoints
     kSpaceTrajectory = traj.k_trajectory; %[mm^-1]
+    kTime = traj.t;
 
     %initalize graident trajectory
     gradientTraj = complex(zeros(size(kSpaceTrajectory)), 0);
@@ -30,29 +30,46 @@ function [gradientTraj, gradientTime] = MRSI_load_ktrajectory(traj, gMax)
     for excite = size(kSpaceTrajectory, 1):-1:1
         %Initalize the previous k space point
         previousKSpacePosition = 0;
+        previousTime = 0;
         for k = 1:size(kSpaceTrajectory, 2)
             %Get the difference between two k space points
-            k_diff = kSpaceTrajectory(excite, k) - previousKSpacePosition;
+            kSpaceDifference = kSpaceTrajectory(excite, k) - previousKSpacePosition;
+            timeDifference = kTime(k) - previousTime;
 
-            %Calculate the gradient from the difference (Numerical derrivative)
-            gradient = calculateGradient(k_diff, dwellTime, gamma);
-            time = dwellTime;
-            if(gradient > gMax)
+            if(timeDifference == 0)
+                %calculate how to get to k_diff with the smallest amount of time
+                timeStep = getFastestTime(kSpaceDifference, gradientMax, gamma);
+                gradient = calculateGradient(kSpaceDifference, timeStep, gamma);
+            else
+                %Calculate the gradient from the difference (Numerical derrivative)
+                gradient = calculateGradient(kSpaceDifference, timeDifference, gamma);
+                timeStep = timeDifference;
+            end
+            if(abs(real(gradient)) > gradientMax || abs(imag(gradient)) > gradientMax)
                 error('MRSI_load_trajectory:gMaxExceeded', '%d exceeds gMax', gradient)
             end
             
-
-            %Create struct from set variables
-            gradientTime(excite, k) = time;
+            %Set k space time and gradient
+            gradientTime(excite, k) = timeStep;
             gradientTraj(excite, k) = gradient;
 
             %set k_prev to the current k space position
             previousKSpacePosition = kSpaceTrajectory(excite, k);
+            previousTime = kTime(k);
         end
     end
 end
 
-function [gradient] = calculateGradient(k_diff, dwellTime, gamma)
+function [gradient] = calculateGradient(kDifference, timeStep, gamma)
     %Calculate the gradient from the difference (Numerical derrivative)
-    gradient = k_diff/(dwellTime * gamma);
+    if(kDifference == 0)
+        gradient = 0;
+    else
+        gradient = kDifference/(timeStep * gamma);
+    end 
+end
+
+function timeStep = getFastestTime(kDifference, gradientMax, gamma)
+    timeStep = abs(kDifference)/(gradientMax * gamma);
+    timeStep = max(real(timeStep), imag(timeStep));
 end

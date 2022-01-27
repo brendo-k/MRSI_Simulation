@@ -12,14 +12,16 @@ classdef Trajectory
         t
         sw
         spatialPoints
+        spectralLength
     end
     methods
-        function obj = Trajectory(name, k_trajectory, imageSize, FoV, dwellTime, ...
+        function obj = Trajectory(name, k_trajectory, imageSize, spectralLength, FoV, dwellTime, ...
             sw, t, spatialPoints, TR)
             arguments
                 name (1,:) char
                 k_trajectory (:, :) double
-                imageSize (1,3) double
+                imageSize (1,2) double
+                spectralLength (1, 1) double
                 FoV (1,2) double
                 dwellTime (1,1) double
                 sw (1,1) double
@@ -32,6 +34,7 @@ classdef Trajectory
             obj.pixel_width.x = FoV(1)/imageSize(1);
             obj.pixel_width.y = FoV(2)/imageSize(2);
             obj.imageSize = imageSize;
+            obj.spectralLength = spectralLength;
             obj.FoV.y = FoV(2);
             obj.FoV.x = FoV(1);
             obj.t = t;
@@ -44,13 +47,13 @@ classdef Trajectory
             obj.spatialPoints = spatialPoints;
         end
         
-        function write_to_file(obj, file_name)
+        function writeTrajectoryToFile(obj, fileName)
             arguments
                 obj (1,1) Trajectory
-                file_name (1,:) char 
+                fileName (1,:) char 
             end
             
-            writematrix(["TR", "K_x", "K_y", "time"], file_name, 'WriteMode', 'overwrite');
+            writematrix(["TR", "K_x", "K_y", "time"], fileName, 'WriteMode', 'overwrite');
             spatial_slice = obj.k_trajectory(:, 1:obj.spatialPoints);
             linear_traj = reshape(spatial_slice.', [], 1);
             linear_traj = [real(linear_traj) imag(linear_traj)];
@@ -62,7 +65,7 @@ classdef Trajectory
             time = time(:);
             svg = horzcat(tr, linear_traj, time);
             
-            writematrix(svg, file_name, 'WriteMode', 'append');
+            writematrix(svg, fileName, 'WriteMode', 'append');
             
         end
     end

@@ -29,21 +29,25 @@ function [out, spin_animation] = MRSI_simulate_gpu(traj, phantom, gMax, B0, B0_m
     end
     functionTimer = tic;
 
+    %if the phantom is empty, data is stored in files.
     if(isempty(phantom.spins{1}))
         MemoryOptions.use_disc = 1;
     end
-
-    %Calculate gradient, k space, and spatical parameters
+   
+    %Calculate gradients and time steps for each gradient
     [gradient, gradientTime] = MRSI_load_ktrajectory(traj, gMax);
+
+    %convert to gpu
     gradient = gpuArray(gradient);
     gradientTime = gpuArray(gradientTime);
-    %Initalize array for signal readout
+
+    %Initalize array for signal readout. Dims are (num Metabolites, TR, readout points)
     MRSISignal = zeros([length(phantom.met), size(gradient, [1, 2])]);
     MRSISignal = complex(MRSISignal, 0);
 
     isCartesian = false;
     if(strcmp(traj.name, 'cartesian')); isCartesian = true; end
-    TE = 0.001;
+    TE = 0.010;
     %voxel_sig = complex(zeros(size(gradient,1), size(gradient, 2), x_phantom_size, y_phantom_size), 0);
     for m = 1:length(phantom.met)
         spins = getSpins(MemoryOptions, phantom, m);
@@ -69,6 +73,7 @@ function [out, spin_animation] = MRSI_simulate_gpu(traj, phantom, gMax, B0, B0_m
             %set spins for this TR.
             trSpins = spins;
             trSpins = gpuArray(trSpins);
+            timeElapsed = 0;
             for k=1:size(gradient, 2)
                 %get map of gradient for each voxel position in the grid
                 curGradient = gradient(trNumber, k);
@@ -76,6 +81,7 @@ function [out, spin_animation] = MRSI_simulate_gpu(traj, phantom, gMax, B0, B0_m
                 gradientMap = gradientMap(nonZeroIndex);
                 %Calculate hamiltonians
                 timeStep = gradientTime(trNumber, k);
+                timeElapsed = timeElapsed + timeStep;
                 if(~isCartesian) || k <= 2
                     gradientFrequency = getFrequencyFromGradients(gradientMap, shieldingFactor);
                     HAB_effective = calculateNewHAB(Iz, gradientFrequency, HAB);
@@ -85,6 +91,7 @@ function [out, spin_animation] = MRSI_simulate_gpu(traj, phantom, gMax, B0, B0_m
                 %Apply Hamiltonians
                 trSpins = applyHamiltonians(trSpins, H, H_inv, is_diag);
                 if(k == 1 && Debug.spinEcho)
+                    timeElapsed = timeElapsed - timeStep;
                     trSpins = MRSI_evolve(trSpins, TE - timeStep, 'argument_type', 'matrix', 'HAB', phantom.met(m).HAB);
                 end
                 %get signal
@@ -116,7 +123,7 @@ end
 %get the readout from all voxels for metabolite m
 function scaledSignal = getSignalFromSpins(spins, Trc, scale)
     
-    sumSpins = squeeze(sum(spins, 3));
+    sumSpins = sum(spins, 3);
     signal = trace(sumSpins*Trc);
     scaledSignal = scale*signal;
 end
@@ -127,8 +134,8 @@ function [H, H_inv, is_diag] = calculateHamiltonians(new_HAB, time)
     %get the new HAB for each spin at each voxel.
 
     if(isdiag(new_HAB(:,:,1)))
-        m = size(new_HAB,1);
-        n = size(new_HAB,3);
+        m = size(new_HAB, 1);
+        n = size(new_HAB, 3);
         diag_idx = get_diag_index(m,n);
 
         HAB_evolve = new_HAB(diag_idx).*(1i*time);
@@ -146,10 +153,11 @@ function [H, H_inv, is_diag] = calculateHamiltonians(new_HAB, time)
         try
             H = myexpm_(HAB_evolve, [], [], false, false, true);
         catch exception
+            disp('Spins system too big! Splitting into two')
             if (strcmp(exception.identifier,'parallel:gpu:array:OOM'))
                 half = floor(size(HAB_evolve, 3)/2);
                 H1 = myexpm_(HAB_evolve(:, :, 1:half), [], [], false, false, true);
-                H2 = myexpm_(HAB_evolve(:, :, half:end), [], [], false, false, true);
+                H2 = myexpm_(HAB_evolve(:, :, half+1:end), [], [], false, false, true);
                 H = cat(3, H1, H2);
             else
                 rethrow(exception);
@@ -210,7 +218,7 @@ end
 
 
 function signalWithDecay = applyT2Decay(traj, metaboliteSignal, phantom, m)
-    t = 0:traj.dwellTime:traj.dwellTime*(size(traj.k_trajectory, 2)-1);
+    t = traj.t;
     signalWithDecay = metaboliteSignal .* exp(-t/phantom.T2(m));
 end
 

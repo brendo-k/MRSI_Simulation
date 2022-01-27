@@ -1,22 +1,34 @@
-function S_remap = MRSI_regrid(S, traj)
+%MRSI_regrid.m
+%Regrids simulted signal to a cartesian axis if aquired using epsi or
+%phaseEncoding.
+
+function signalRemapped = MRSI_regrid(originalSignal, traj)
 arguments
-    S (:,:, :) double
+    originalSignal (:,:, :) double
     traj (1,1) Trajectory
 end
 
 
 if(contains(traj.name, 'cart', 'IgnoreCase', 1))
     %cartesian MRSI
-    S_remap = zeros(traj.imageSize);
-    S_remap = permute(S_remap, [3,1,2]);
+    signalRemapped = zeros([traj.imageSize, traj.spectralLength]);
+    signalRemapped = permute(signalRemapped, [3,1,2]);
     
-    for readout = 1:size(S, 2)
-        [x, y] = ind2sub(traj.imageSize(1:2), readout);
-        S_remap(:, x, y) = S(1, readout, :);
+    for readout = 1:size(originalSignal, 2)
+        [y, x] = ind2sub(traj.imageSize(1:2), readout);
+        signalRemapped(:, y, x) = originalSignal(1, readout, :);
     end
-    S_remap = permute(S_remap, [1,3,2]);
+elseif(contains(traj.name, 'epsi', 'IgnoreCase', true))
+    signalRemapped = zeros([traj.imageSize, traj.spectralLength]);
+    signalRemapped = permute(signalRemapped, [3,1,2]);
+
+    for iPoint = 1:traj.spectralLength
+        signalStart = (traj.spatialPoints * (iPoint - 1)) + 1;
+        signalEnd = (traj.spatialPoints * iPoint);
+        signalRemapped(iPoint, :, :) = originalSignal(1, :, signalStart:signalEnd);
+    end
 else
-    S_remap = permute(S, [2, 1]);
+    signalRemapped = permute(originalSignal, [3, 1, 2]);
 end
 
     

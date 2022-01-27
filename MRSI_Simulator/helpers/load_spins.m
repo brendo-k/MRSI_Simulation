@@ -11,5 +11,5 @@ spins = fread(file_id,inf, 'single=>single');
 fclose(file_id);
 
 %reshape spins back into proper dimensions
-spins = reshape(spins, [length(phantom.y), length(phantom.x), size(phantom.d{m}, [1,2])]);
+spins = reshape(spins, [size(phantom.d{m}, [1,2]), length(phantom.y), length(phantom.x)]);
 end
