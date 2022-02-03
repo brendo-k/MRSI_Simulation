@@ -7,15 +7,17 @@
 %             readOutTime: readout time in the spectral dimension
 %             repetitionTime: Time between each excitation    
 
-function obj = phaseEncoded(spectralWidth, Fov, imageSize, spectralSize)
+function obj = phaseEncoded(trajectoryParameters)
 arguments
-    spectralWidth (1,1) double = 2500 %[Hz]
-    Fov (2,1) double =  [250, 250]; %FoV in mm
-    imageSize (2,1) double = [8, 8]; %number of voxels in the x and y direction
-    spectralSize (1, 1) double = 512
+    trajectoryParameters.spectralWidth (1,1) double = 2500 %[Hz]
+    trajectoryParameters.Fov (2,1) double =  [250, 250]; %FoV in mm
+    trajectoryParameters.imageSize (2,1) double = [8, 8]; %number of voxels in the x and y direction
+    trajectoryParameters.spectralSize (1, 1) double = 512
 end
-
-    %calculating the same image parameters as the default parameters in Rosette.m 
+    spectralWidth = trajectoryParameters.spectralWidth;
+    Fov = trajectoryParameters.Fov;
+    imageSize = trajectoryParameters.imageSize;
+    spectralSize = trajectoryParameters.spectralSize;
 
     %updating local variables from parameters
     deltaFovX = Fov(1)/imageSize(1); %[mm]

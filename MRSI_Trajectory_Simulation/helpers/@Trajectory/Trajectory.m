@@ -31,8 +31,8 @@ classdef Trajectory
             end
             obj.name = name;
             obj.k_trajectory  = k_trajectory;
-            obj.pixel_width.x = FoV(1)/imageSize(1);
-            obj.pixel_width.y = FoV(2)/imageSize(2);
+            obj.pixel_width.y = FoV(1)/imageSize(1);
+            obj.pixel_width.x = FoV(2)/imageSize(2);
             obj.imageSize = imageSize;
             obj.spectralLength = spectralLength;
             obj.FoV.y = FoV(2);

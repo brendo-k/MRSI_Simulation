@@ -114,7 +114,8 @@ end
 %get the readout from all voxels for metabolite m
 function scaledSignal = getSignalFromSpins(spins, Trc, scale)
     
-    sumSpins = squeeze(sum(spins, 3));
+    sumSpins = sum(spins, 3);
+    sumSpins = squeeze(sumSpins);
     signal = trace(sumSpins*Trc);
     scaledSignal = scale*signal;
 end

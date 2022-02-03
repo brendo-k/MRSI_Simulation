@@ -29,7 +29,8 @@ classdef (SharedTestFixtures = { ...
     end
     methods(Test)
         function testNoGradient(testCase)
-            trajectory = phaseEncoded(2000, [200, 200], [1, 1, 512]);
+            trajectory = phaseEncoded('spectralWidth',2000, 'Fov', [200, 200], ...
+                'imageSize', [1, 1], 'spectralSize', 512);
             output = MRSI_simulate(trajectory, testCase.phantom, 30, 3, 'spinEcho', true);
             frequency = (testCase.metabolite.shifts(1) - 4.65)*testCase.gamma*testCase.b0/1e6;
             time = 0:trajectory.dwellTime:trajectory.dwellTime*(trajectory.imageSize(3) - 1);
@@ -40,7 +41,8 @@ classdef (SharedTestFixtures = { ...
         end
 
         function testYGradient(testCase)
-            trajectory = phaseEncoded(2000, [201, 201], [3, 1, 512]);
+            trajectory = phaseEncoded('spectralWidth', 2000, 'Fov', [201, 201], ...
+                'imageSize', [3, 1], 'spectralSize', 512);
             output = MRSI_simulate(trajectory, testCase.phantom, 30, 3, 'spinEcho', true);
 
             kStart = trajectory.k_trajectory(:, 1);
@@ -67,7 +69,8 @@ classdef (SharedTestFixtures = { ...
         end
 
         function testXGradient(testCase)
-            trajectory = phaseEncoded(2000, [201, 201], [1, 3, 512]);
+            trajectory = phaseEncoded("spectralWidth", 2000, 'Fov',[201, 201], ...
+                'imageSize', [1, 3], 'spectralSize');
             output = MRSI_simulate(trajectory, testCase.phantom, 30, 3, 'spinEcho', true);
 
             kStart = trajectory.k_trajectory(:, 1);

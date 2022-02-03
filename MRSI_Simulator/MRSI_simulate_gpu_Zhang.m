@@ -16,7 +16,7 @@
 % Output:
 % out: FID-A MRSI object
 % voxel_sig: REDUNDANT, to be used for annimations. WORK IN PROGRESS
-function [out, spin_animation] = MRSI_simulate_gpu(traj, phantom, gMax, B0, B0_map, MemoryOptions, Debug)
+function [out, spin_animation] = MRSI_simulate_gpu_Zhang(traj, phantom, gMax, B0, B0_map, MemoryOptions, Debug)
     arguments
         traj (1,1) Trajectory
         phantom (:, :) struct
@@ -52,16 +52,20 @@ function [out, spin_animation] = MRSI_simulate_gpu(traj, phantom, gMax, B0, B0_m
             spins = MRSI_evolve(spins, TE, 'argument_type', 'matrix', 'HAB', phantom.met(m).HAB);
             spins = MRSI_excite(spins, 180, 'x', 'argument_type', 'matrix', 'F', phantom.met(m).Fx);
         end
-        [spins, nonZeroIndex] = vectorizeSpins(spins);
         fprintf("simulating metabolite %s\n", phantom.met_names{m})
-
+        
+        x = single(phantom.x);
+        y = single(phantom.y);
+        [xMesh, yMesh] = getVoxelCoordinateGrid(phantom);
         met = phantom.met(m);
+        xPropogator = zeros([size(met.HAB, [1,2]) length(x)]);
+        yPropogator = zeros([size(met.HAB, [1,2]) length(x)]);
+        b0Propagator = exp(B0_map*-1i)
         %change variables to be gpuArrays
-        [trc, Iz, HAB] = convertToGPU(met);
-        [xGrid, yGrid] = getVoxelCoordinateGrid(phantom);
-
+        [trc, Iz, HAB] = convertToGPU(met, B0);
+        shieldingFactor = convertToShieldingFactor(single(met.shifts), B0);
         metaboliteSignal = complex(zeros(size(gradient, 1, 2)), 0);
-        shieldingFactor = convertToShieldingFactor(met.shifts);
+
         for trNumber = 1:size(gradient, 1)
             trTimer = tic;
             fprintf("simulating TR number %d\n", trNumber)
@@ -73,17 +77,18 @@ function [out, spin_animation] = MRSI_simulate_gpu(traj, phantom, gMax, B0, B0_m
             for k=1:size(gradient, 2)
                 %get map of gradient for each voxel position in the grid
                 curGradient = gradient(trNumber, k);
-                gradientMap = getGradientMap(curGradient, xGrid, yGrid, B0_map, B0);
-                gradientMap = gradientMap(squeeze(nonZeroIndex));
+                gradientX = x * real(curGradient);
+                gradientY = y * imag(curGradient);
+
                 %Calculate hamiltonians
                 timeStep = gradientTime(trNumber, k);
                 timeElapsed = timeElapsed + timeStep;
-                if(~isCartesian) || k <= 2
-                    gradientFrequency = getFrequencyFromGradients(gradientMap, shieldingFactor, met, B0);
-                    HAB_effective = calculateNewHAB(Iz, gradientFrequency, HAB);
 
-                    [H, H_inv, is_diag] = calculateHamiltonians(HAB_effective, timeStep);
-                end
+                
+                gradientFrequency = getFrequencyFromGradients(gradientMap, shieldingFactor);
+                HAB_effective = calculateNewHAB(Iz, gradientFrequency, HAB);
+
+                [H, H_inv, is_diag] = calculateHamiltonians(HAB_effective, timeStep);
                 %Apply Hamiltonians
                 trSpins = applyHamiltonians(trSpins, H, H_inv, is_diag);
                 if(k == 1 && Debug.spinEcho)
@@ -187,17 +192,13 @@ end
 
 
 
-function gradientMap = getGradientMap(gradient, xGrid, yGrid, B0Map, b0)
+function gradientMap = getGradientMap(gradient, xGrid, yGrid, B0Map)
     %apply gradient to x and y directions to form a gradient matrix.
     %grad_matrix has gradient strength at the x and y position;
     currentGradientX = real(gradient);
     currentGradientY = imag(gradient);
     gradientMap = currentGradientX*xGrid + currentGradientY*yGrid;
-    gradientMap = gradientMap + B0Map + b0;
-end
-
-function shieldingFactor = convertToShieldingFactor(shifts)
-    shieldingFactor = (shifts)/1e6 + 1;
+    gradientMap = gradientMap + B0Map;
 end
 
 
@@ -223,29 +224,39 @@ function signalWithDecay = applyT2Decay(traj, metaboliteSignal, phantom, m)
 end
 
 
+function shieldingFactor = convertToShieldingFactor(shifts, b0)
+    gamma = 42577000;
+    spinHertz = shifts*(gamma*b0)/10e6 + gamma*b0;
+    shieldingFactor = spinHertz/(gamma*b0);
+end
+
+
 function [xGrid, yGrid] = getVoxelCoordinateGrid(phantom)
     %create an matrix of x and y coordinates (used for speedup)
     [xGrid, yGrid] = meshgrid(single(phantom.x), single(phantom.y));
+    xGrid = gpuArray(xGrid);
+    yGrid = gpuArray(yGrid);
 end
 
-function [trc,  Iz, HAB] = convertToGPU(met)
+function [trc, Iz, HAB] = convertToGPU(met)
     trc = gpuArray(single(met.Fx + 1i*met.Fy));
     Iz = gpuArray(single(met.Iz));
     HAB = gpuArray(single(met.HAB));
 end
 
-function offsetFrequency = getFrequencyFromGradients(gradients, shielding, met, b0)
+function offsetFrequency = getFrequencyFromGradients(gradients, shielding)
     %gyromagnetic ratio
-    gamma = -getGamma('overTwoPi', false);
-    currentFrequency = shielding * gradients * gamma;
-    offsetFrequency = currentFrequency - met.shifts_rads - gamma * b0;
+    gamma=42577000;  %[(cycles/ms)/T]
+
+    %convert to rads/s
+    offsetFrequency = gamma*gradients*2*pi*shielding';
 end
 
 %calculate new HAB. We can take advantage that HAB is already calculated. We
 %only need to add Iz_1*shift1Gradient + IZ_2*shift2Gradient
 function new_HAB = calculateNewHAB(Iz, gradientFrequency, HAB)
     Iz = permute(Iz, [1,3,2]);
-    IzMultiplied = pagefun(@mtimes, Iz, gradientFrequency');
+    IzMultiplied = pagemtimes(Iz, gradientFrequency');
     IzMultiplied = permute(IzMultiplied, [1,3,2]);
     
     %sum along the third dimension (stack of matricies) and add HABJonly.

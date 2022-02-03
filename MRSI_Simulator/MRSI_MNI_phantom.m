@@ -3,7 +3,7 @@ arguments
     B0 (1,1) double
     slice (1,1) double {mustBePositive}
     mets (:,1) struct = [];
-    T2_met (1,1) double = 0.1;
+    T2_met (1,1) double = 0.3;
     T2_lip (1,1) double = 0.001;
     MemoryOptions.use_disc (1,1) logical = 0
 end

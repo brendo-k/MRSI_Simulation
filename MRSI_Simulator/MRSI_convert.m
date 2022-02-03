@@ -57,6 +57,10 @@ function out = MRSI_convert(data, traj, B0)
     out.coordinates.y = yCoordinates;
 
 
+    out = updateFlags(out);
+end
+
+function out = updateFlags(out)
     %FILLING IN THE FLAGS
     out.flags.writtentostruct=1;
     out.flags.gotparams=1;
