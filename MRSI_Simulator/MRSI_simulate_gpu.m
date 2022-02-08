@@ -16,18 +16,22 @@
 % Output:
 % out: FID-A MRSI object
 % voxel_sig: REDUNDANT, to be used for annimations. WORK IN PROGRESS
-function [out, spin_animation] = MRSI_simulate_gpu(traj, phantom, gMax, B0, B0_map, MemoryOptions, Debug)
+function [out, spin_animation] = MRSI_simulate_gpu(traj, phantom, scanParameters, MemoryOptions, Debug)
     arguments
         traj (1,1) Trajectory
         phantom (:, :) struct
-        gMax (1,1) double = 30
-        B0 (1,1) double = 3
-        B0_map (:, :) double = zeros(length(phantom.y), length(phantom.x));
+        scanParameters.gMax (1,1) double = 30
+        scanParameters.B0 (1,1) double = 3
+        scanParameters.B0_map (:, :) double = zeros(length(phantom.y), length(phantom.x));
         MemoryOptions.use_disc (1,1) logical = 0;
-        Debug.plot_spins = 0;
+        Debug.plot_spins (1, 1) logical = 0;
         Debug.spinEcho (1, 1) logical = false;
+        Debug.plot_spins_tr (1, 1) double = 0;
     end
     functionTimer = tic;
+    gMax = scanParameters.gMax;
+    B0 = scanParameters.B0;
+    B0_map = scanParameters.B0_map;
 
     %if the phantom is empty, data is stored in files.
     if(isempty(phantom.spins{1}))
@@ -45,6 +49,9 @@ function [out, spin_animation] = MRSI_simulate_gpu(traj, phantom, gMax, B0, B0_m
     if(strcmp(traj.name, 'cartesian')); isCartesian = true; end
     TE = 0.010;
     %voxel_sig = complex(zeros(size(gradient,1), size(gradient, 2), x_phantom_size, y_phantom_size), 0);
+    if(Debug.plot_spins == true)
+        %TODO: save spins to visualize
+    end
     for m = 1:length(phantom.met)
         spins = getSpins(MemoryOptions, phantom, m);
         spins = MRSI_excite(spins, 90, 'y', 'argument_type', 'matrix', 'F', phantom.met(m).Fy);
@@ -93,6 +100,10 @@ function [out, spin_animation] = MRSI_simulate_gpu(traj, phantom, gMax, B0, B0_m
                 %get signal
                 scale = 2 ^ (2 - met.nspins);
                 metaboliteSignal(trNumber, k) = getSignalFromSpins(trSpins, trc, scale);
+                
+                if(Debug.plot_spins == true && Debug.plot_spins_tr == trNumber)
+                    
+                end
                 
             end
             trExecutionTime = toc(trTimer);
@@ -193,11 +204,11 @@ function gradientMap = getGradientMap(gradient, xGrid, yGrid, B0Map, b0)
     currentGradientX = real(gradient);
     currentGradientY = imag(gradient);
     gradientMap = currentGradientX*xGrid + currentGradientY*yGrid;
-    gradientMap = gradientMap + B0Map + b0;
+    gradientMap = gradientMap + B0Map;
 end
 
 function shieldingFactor = convertToShieldingFactor(shifts)
-    shieldingFactor = (shifts)/1e6 + 1;
+    shieldingFactor = (shifts)/1e6;
 end
 
 
@@ -237,8 +248,10 @@ end
 function offsetFrequency = getFrequencyFromGradients(gradients, shielding, met, b0)
     %gyromagnetic ratio
     gamma = -getGamma('overTwoPi', false);
-    currentFrequency = shielding * gradients * gamma;
-    offsetFrequency = currentFrequency - met.shifts_rads - gamma * b0;
+    ppm = met.shifts;
+    offsetFrequency = gamma * gradients * (ppm / 1e6 + 1);
+%     currentFrequency = shielding * gradients * gamma;
+%     offsetFrequency = currentFrequency - gamma * b0 - met.shifts_rads;
 end
 
 %calculate new HAB. We can take advantage that HAB is already calculated. We

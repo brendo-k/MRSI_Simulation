@@ -9,8 +9,8 @@
 
 function obj = phaseEncoded(trajectoryParameters)
 arguments
-    trajectoryParameters.spectralWidth (1,1) double = 2500 %[Hz]
-    trajectoryParameters.Fov (2,1) double =  [250, 250]; %FoV in mm
+    trajectoryParameters.spectralWidth (1,1) double = 2000 %[Hz]
+    trajectoryParameters.Fov (2,1) double =  [200, 200]; %FoV in mm
     trajectoryParameters.imageSize (2,1) double = [8, 8]; %number of voxels in the x and y direction
     trajectoryParameters.spectralSize (1, 1) double = 512
 end
@@ -50,6 +50,6 @@ end
     %add plus one because the zeroth point is counted
     traj = repmat(traj, [1, spectralSize]);
     
-    obj = Trajectory('cartesian', traj, imageSize, spectralSize, Fov, spectrallDwellTime, spectralWidth, t, 1);
+    obj = Trajectory('cartesian', traj, imageSize, spectralSize, Fov, spectrallDwellTime, spectralWidth, t, 0.5);
 end
     
