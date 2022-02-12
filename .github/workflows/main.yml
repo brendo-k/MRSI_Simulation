@@ -12,15 +12,10 @@ jobs:
  build:
    runs-on: ubuntu-latest
    steps:
+     - name: Check out latest repository
      - uses: actions/checkout@v2
-     - uses: joergbrech/moxunit-action@master
-       with:
-         tests: tests
-         src: MRSI_Simulator
-         with_coverage: true
-         doc_tests: true
-         cover_xml_file: coverage.xml
-     - uses: codecov/codecov-action@v1
-       with:
-         file: ./coverage.xml
 
+     - name: Run MATLAB Tests
+       uses: matlab-actions/run-tests@v1.0.1
+       with:
+         select-by-folder: tests

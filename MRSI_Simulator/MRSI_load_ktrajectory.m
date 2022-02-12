@@ -10,10 +10,10 @@
 % gMax: gradient max [mT/m] -> T/mm
 function [gradientTraj, gradientTime] = MRSI_load_ktrajectory(traj, gradientMax)
 
-    gradientMax = gradientMax/(10^6); %[T/mm]
+    gradientMax = gradientMax/10^6; %[T/mm]
 
     %gyromagnetic for H
-    gamma = 42577000; %[Hz⋅T^−1]
+    gamma = getGamma("overTwoPi", true); %[Hz⋅T^−1]
     %dimension is TR, trajectoryPoints
     kSpaceTrajectory = traj.k_trajectory; %[mm^-1]
     kTime = traj.t;

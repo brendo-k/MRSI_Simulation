@@ -249,7 +249,7 @@ function offsetFrequency = getFrequencyFromGradients(gradients, shielding, met, 
     %gyromagnetic ratio
     gamma = -getGamma('overTwoPi', false);
     ppm = met.shifts;
-    offsetFrequency = gamma * gradients * (ppm / 1e6 + 1);
+    offsetFrequency = gamma * gradients * (ppm' / 1e6 + 1);
 %     currentFrequency = shielding * gradients * gamma;
 %     offsetFrequency = currentFrequency - gamma * b0 - met.shifts_rads;
 end
