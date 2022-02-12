@@ -13,7 +13,7 @@ jobs:
    runs-on: ubuntu-latest
    steps:
      - name: Check out latest repository
-     - uses: actions/checkout@v2
+       uses: actions/checkout@v2
 
      - name: Run MATLAB Tests
        uses: matlab-actions/run-tests@v1.0.1
