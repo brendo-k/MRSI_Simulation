@@ -20,4 +20,5 @@ jobs:
      - name: Run MATLAB Tests
        uses: matlab-actions/run-tests@v1.0.1
        with:
+         source-folder: MRSI_Simulator; MRSI_Trajectory_Simulation
          select-by-folder: tests
