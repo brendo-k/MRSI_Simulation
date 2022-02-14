@@ -56,6 +56,7 @@ classdef testMRSIBuildPhantom < matlab.unittest.TestCase
             h2o.shifts = h2o.shifts - 4.65;
             [H, d] = sim_Hamiltonian(h2o, 3);
             d = repmat(single(d{1}), [1, 1, 32, 32]);
+
             testCase.verifyEqual(H, met);
             testCase.verifyEqual(den(:, :, 1:32, 1:32), d);
             
