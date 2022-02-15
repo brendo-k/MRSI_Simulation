@@ -3,7 +3,7 @@ classdef (SharedTestFixtures = { ...
         testMRSILoadTrajectory < matlab.unittest.TestCase
     properties
         gMax = 30;
-        gamma = 42577000;
+        gamma = getGamma("overTwoPi", true);
     end
 
     methods(Test)
@@ -17,15 +17,23 @@ classdef (SharedTestFixtures = { ...
         end
 
         function testPhaseEncoded(testCase)
+            %ASSIGN
             trajectory = phaseEncoded('spectralWidth', 2000, 'Fov' ,[200, 200], ...
                 'imageSize', [3, 3], 'spectralSize', 512);
-            [gradient, time] = MRSI_load_ktrajectory(trajectory, testCase.gMax);
-            realGradient = trajectory.k_trajectory(:, 1)/(testCase.gamma*trajectory.dwellTime);
+            trajectorySize = size(trajectory.k_trajectory);
+            timeToFirstPoint = abs(trajectory.k_trajectory(:, 1))/(testCase.gamma*testCase.gMax/10^6);
+            maxTime = max(timeToFirstPoint);
+            expectedGradient = trajectory.k_trajectory(:, 1)/(testCase.gamma*maxTime);
+            expectedGradient = [expectedGradient, zeros(trajectorySize(1), trajectorySize(2) - 1)];
+            expectedTime = [repmat(maxTime, trajectorySize(1), 1), repmat(trajectory.dwellTime, trajectorySize(1), trajectorySize(2) - 1)];
             
-            testCase.verifyEqual(gradient(:, 1), realGradient);
-            %testing if points after first is zero.
-            testCase.verifyEqual(gradient(:, 2:end), zeros(size(gradient(:, 2:end))));
-            testCase.verifyEqual(time, repmat(trajectory.dwellTime, size(time)));
+            
+            %APPLY
+            [gradient, time] = MRSI_load_ktrajectory(trajectory, testCase.gMax);
+            
+            %ASSERT
+            testCase.verifyEqual(gradient, expectedGradient);
+            testCase.verifyEqual(time, expectedTime);
         end
 
     end

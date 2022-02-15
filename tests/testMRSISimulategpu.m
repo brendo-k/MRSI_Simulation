@@ -1,6 +1,6 @@
 classdef (SharedTestFixtures = { ...
         matlab.unittest.fixtures.PathFixture({'./tools', '../MRSI_Trajectory_Simulation/'})})...
-        testMRSISimulate < matlab.unittest.TestCase
+        testMRSISimulategpu < matlab.unittest.TestCase
     properties
         metabolite
         phantom
@@ -33,12 +33,12 @@ classdef (SharedTestFixtures = { ...
             %ARRANGE
             trajectory = phaseEncoded('spectralWidth',2000, 'Fov', [200, 200], ...
                 'imageSize', [1, 1], 'spectralSize', 512);
-            frequency = testMRSISimulate.getFrequency(testCase);
+            frequency = testMRSISimulategpu.getFrequency(testCase);
             time = trajectory.t;
-            points = testMRSISimulate.readout(frequency, time, testCase.T2, testCase.scalingFactor);
+            points = testMRSISimulategpu.readout(frequency, time, testCase.T2, testCase.scalingFactor);
 
             %ACT 
-            output = MRSI_simulate(trajectory, testCase.phantom, 30, 3, 'spinEcho', true);
+            output = MRSI_simulate_gpu(trajectory, testCase.phantom, 'spinEcho', true);
 
             %ASSERT
             testCase.verifyEqual(output.data, points', 'RelTol', 0.00001);
@@ -47,18 +47,20 @@ classdef (SharedTestFixtures = { ...
         function testYGradient(testCase)
             trajectory = phaseEncoded('spectralWidth', 2000, 'Fov', [201, 201], ...
                 'imageSize', [1, 3], 'spectralSize', 512);
-            output = MRSI_simulate(trajectory, testCase.phantom, 50, 3, 'spinEcho', true);
 
-            phaseMap = testMRSISimulate.getPhaseMapFromKSpace(testCase, trajectory.k_trajectory(:, 1));
-            frequency = testMRSISimulate.getFrequency(testCase);
+            phaseMap = testMRSISimulategpu.getPhaseMapFromKSpace(testCase, trajectory.k_trajectory(:, 1));
+            frequency = testMRSISimulategpu.getFrequency(testCase);
             time = trajectory.t;
-            points = testMRSISimulate.readout(frequency, time, testCase.T2, testCase.scalingFactor);
+            points = testMRSISimulategpu.readout(frequency, time, testCase.T2, testCase.scalingFactor);
             points = repmat(points', [1, prod(testCase.resolution), size(phaseMap, 2)]);
             points = permute(points, [2,3,1]);
             points = points .* phaseMap;
             points = permute(points, [3, 1, 2]);
             points = squeeze(sum(points, 2));
             points = reshape(points, [size(points, 1), 1, size(points, 2)]);
+
+            output = MRSI_simulate_gpu(trajectory, testCase.phantom, 'spinEcho', true);
+
             testCase.verifyEqual(output.data, points, 'RelTol', 0.000001);
         end
 
@@ -68,10 +70,10 @@ classdef (SharedTestFixtures = { ...
                 'imageSize', [3, 1], 'spectralSize', 512);
 
             
-            phaseMap = testMRSISimulate.getPhaseMapFromKSpace(testCase, trajectory.k_trajectory(:, 1));
-            frequency = testMRSISimulate.getFrequency(testCase);
+            phaseMap = testMRSISimulategpu.getPhaseMapFromKSpace(testCase, trajectory.k_trajectory(:, 1));
+            frequency = testMRSISimulategpu.getFrequency(testCase);
             time = trajectory.t;
-            points = testMRSISimulate.readout(frequency, time, testCase.T2, 2);
+            points = testMRSISimulategpu.readout(frequency, time, testCase.T2, 2);
             points = repmat(points', [1, size(phaseMap)]);
             points = permute(points, [2, 3, 1]);
             points = points .* phaseMap;
@@ -79,7 +81,7 @@ classdef (SharedTestFixtures = { ...
             points = squeeze(sum(points, 2));
             points = reshape(points, [size(points, 1), size(points, 2)]);
 
-            output = MRSI_simulate(trajectory, testCase.phantom, 50, 3, 'spinEcho', true);
+            output = MRSI_simulate_gpu(trajectory, testCase.phantom, 'spinEcho', true);
             testCase.verifyEqual(output.data, points, 'RelTol', 0.000001);
         end
     end
