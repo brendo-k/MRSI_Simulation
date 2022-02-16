@@ -69,7 +69,7 @@ end
 
 %loop through all metabolites and get hamiltonian and density matrix
 for m = length(allMets):-1:1
-    [phantom.met(m), d] = sim_Hamiltonian(allMets{m}, b0);
+    [phantom.met(m), d] = sim_Hamiltonian_ms(allMets{m}, b0);
     phantom.d{m} = single(d{1});
     phantom.met_names{m} = allMets{m}.name;
     phantom.spins{m} = zeros(size(d{1}, 1), size(d{1}, 2), size(met, 1), size(met, 2), 'single');

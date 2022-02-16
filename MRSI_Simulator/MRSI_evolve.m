@@ -12,16 +12,15 @@
 %Output
 %   phantom: phantom after free evolution
 
-function [phantom] = MRSI_evolve(phantom, time, MemoryOptions, ArgumentOptions)
+function [phantom] = MRSI_evolve(phantom, time_ms, MemoryOptions, ArgumentOptions)
     arguments
         phantom
-        time (1,1) {mustBeNonnegative}
+        time_ms (1,1) {mustBeNonnegative}
         MemoryOptions.use_disc (1,1) logical = 0
         ArgumentOptions.argument_type {mustBeMember(ArgumentOptions.argument_type,{'struct', 'matrix'})} = "struct"
         ArgumentOptions.HAB (:,:) double
     end
 
-    time_ms = time*1000;
     %STUCT PASSED INTO PHANTOM VARIABLE
     if(strcmp(ArgumentOptions.argument_type, 'struct'))
         for m = 1:length(phantom.met)

@@ -40,6 +40,7 @@ function [out, spin_animation] = MRSI_simulate_gpu(traj, phantom, scanParameters
    
     %Calculate gradients and time steps for each gradient
     [gradient, gradientTime] = MRSI_load_ktrajectory(traj, gMax);
+    gradientTime = gradientTime .* 1000;
 
     %Initalize array for signal readout. Dims are (num Metabolites, TR, readout points)
     MRSISignal = zeros([length(phantom.met), size(gradient, [1, 2])]);

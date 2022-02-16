@@ -45,7 +45,8 @@ classdef (SharedTestFixtures = { ...
             excitedPhantom = MRSI_excite(testCase.phantom, 90, 'y');
             evolved_phan = MRSI_evolve(excitedPhantom, testCase.period);
             sig = calculateSignal(evolved_phan.met(1), evolved_phan.spins{1});
-            before_sig = calculateSignal(testCase.phantom.met(1), testCase.phantom.spins{1});
+            before_sig = calculateSignal(excitedPhantom.met(1), excitedPhantom.spins{1});
+
             testCase.verifyEqual(sig, before_sig, 'RelTol', testCase.relativeTolerance);
         end
 
@@ -70,7 +71,7 @@ classdef (SharedTestFixtures = { ...
             excitedPhantom = MRSI_excite(testCase.phantom, 90, 'y');
             evolved_phan = MRSI_evolve(excitedPhantom, 3*testCase.period/4);
             sig = calculateSignal(evolved_phan.met(1), evolved_phan.spins{1});
-            testCase.verifyEqual(sig, single(1i), 'RelTol', testCase.relativeTolerance);
+            testCase.verifyEqual(sig, single(1i));
         end
 
         %TESTING ONE EIGHTH ROTATION. SHOULD BE cos(pi/4) + 1i*sin(pi/4)
@@ -78,7 +79,7 @@ classdef (SharedTestFixtures = { ...
             excitedPhantom = MRSI_excite(testCase.phantom, 90, 'y');
             evolved_phan = MRSI_evolve(excitedPhantom, testCase.period/8);
             sig = calculateSignal(evolved_phan.met(1), evolved_phan.spins{1});
-            testCase.verifyEqual(sig, single(cos(pi/4) - 1i*sin(pi/4)), 'RelTol', testCase.relativeTolerance);
+            testCase.verifyEqual(sig, single(cos(pi/4) - 1i*sin(pi/4)));
         end
 
         function test_spin_echo(testCase)
@@ -87,15 +88,15 @@ classdef (SharedTestFixtures = { ...
             evolved_phan = MRSI_excite(evolved_phan, 180, 'x');
             evolved_phan = MRSI_evolve(evolved_phan, testCase.period/4);
             spinEchoSignal = calculateSignal(evolved_phan.met(1), evolved_phan.spins{1});
-            startingSignal = calculateSignal(testCase.phantom.met(1), testCase.phantom.spins{1});
-            testCase.verifyEqual(spinEchoSignal, startingSignal, 'RelTol', testCase.relativeTolerance);
+            startingSignal = calculateSignal(excitedPhantom.met(1), excitedPhantom.spins{1});
+            testCase.verifyEqual(spinEchoSignal, startingSignal);
         end
 
         function testSpinEchoWithGradient(testCase)
             evolved_phan = MRSI_evolve(testCase.phantom, testCase.period/4);
             evolved_phan = MRSI_excite(evolved_phan, 180, 'x');
-            evolved_phan = MRSI_evolve(evolved_phan, 1e-5);
-            evolved_phan = MRSI_evolve(evolved_phan, (testCase.period/4)-1e-5);
+            evolved_phan = MRSI_evolve(evolved_phan, 50);
+            evolved_phan = MRSI_evolve(evolved_phan, (testCase.period/4) - 50);
             spinEchoSignal = calculateSignal(evolved_phan.met(1), evolved_phan.spins{1});
             startingSignal = calculateSignal(testCase.phantom.met(1), testCase.phantom.spins{1});
             testCase.verifyEqual(spinEchoSignal, startingSignal, 'RelTol', testCase.relativeTolerance);
@@ -105,7 +106,7 @@ classdef (SharedTestFixtures = { ...
     end
     methods(Static)
         function period = calculatePeriod(met, B0)
-            gamma = getGamma('overTwoPi', true);
+            gamma = getGamma('overTwoPi', true) / 1000;
             frequency = ((met.shifts(1) - 4.65) * gamma * B0) / 10^6;
             period = 1/frequency;
         end
