@@ -1,0 +1,3 @@
+[submodule "FID-A"]
+	path = resources/FID-A
+	url = git@github.com:brendo-k/FID-A.git
