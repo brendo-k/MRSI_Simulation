@@ -32,8 +32,8 @@ classdef (SharedTestFixtures = { ...
             [gradient, time] = MRSI_load_ktrajectory(trajectory, testCase.gMax);
             
             %ASSERT
-            testCase.verifyEqual(gradient, expectedGradient);
-            testCase.verifyEqual(time, expectedTime);
+            testCase.verifyEqual(gradient, expectedGradient, 'AbsTol', 1e-8);
+            testCase.verifyEqual(time, expectedTime,  'AbsTol', 1e-8);
         end
 
     end

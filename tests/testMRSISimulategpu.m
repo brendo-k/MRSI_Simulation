@@ -41,7 +41,7 @@ classdef (SharedTestFixtures = { ...
             output = MRSI_simulate_gpu(trajectory, testCase.phantom, 'spinEcho', true);
 
             %ASSERT
-            testCase.verifyEqual(output.data, points', 'RelTol', 0.00001);
+            testCase.verifyEqual(output.data, points', 'AbsTol', 1e-3);
         end
 
         function testYGradient(testCase)
@@ -51,7 +51,7 @@ classdef (SharedTestFixtures = { ...
             phaseMap = testMRSISimulategpu.getPhaseMapFromKSpace(testCase, trajectory.k_trajectory(:, 1));
             frequency = testMRSISimulategpu.getFrequency(testCase);
             time = trajectory.t;
-            points = testMRSISimulategpu.readout(frequency, time, testCase.T2, testCase.scalingFactor);
+            points = testMRSISimulategpu.readout(frequency, time, testCase.T2, 2);
             points = repmat(points', [1, prod(testCase.resolution), size(phaseMap, 2)]);
             points = permute(points, [2,3,1]);
             points = points .* phaseMap;
@@ -61,7 +61,7 @@ classdef (SharedTestFixtures = { ...
 
             output = MRSI_simulate_gpu(trajectory, testCase.phantom, 'spinEcho', true);
 
-            testCase.verifyEqual(output.data, points, 'RelTol', 0.000001);
+            testCase.verifyEqual(output.data, points, 'RelTol', 1e-4);
         end
 
         function testXGradient(testCase)
@@ -82,7 +82,7 @@ classdef (SharedTestFixtures = { ...
             points = reshape(points, [size(points, 1), size(points, 2)]);
 
             output = MRSI_simulate_gpu(trajectory, testCase.phantom, 'spinEcho', true);
-            testCase.verifyEqual(output.data, points, 'RelTol', 0.000001);
+            testCase.verifyEqual(output.data, points, 'RelTol', 1e-4);
         end
     end
     methods (Static)

@@ -12,10 +12,10 @@
 %Output
 %   phantom: phantom after free evolution
 
-function [phantom] = MRSI_evolve(phantom, time_ms, MemoryOptions, ArgumentOptions)
+function [phantom] = MRSI_evolve(phantom, time, MemoryOptions, ArgumentOptions)
     arguments
         phantom
-        time_ms (1,1) {mustBeNonnegative}
+        time (1,1) {mustBeNonnegative}
         MemoryOptions.use_disc (1,1) logical = 0
         ArgumentOptions.argument_type {mustBeMember(ArgumentOptions.argument_type,{'struct', 'matrix'})} = "struct"
         ArgumentOptions.HAB (:,:) double
@@ -29,8 +29,8 @@ function [phantom] = MRSI_evolve(phantom, time_ms, MemoryOptions, ArgumentOption
             else
                 spins = phantom.spins{m};
             end
-            Hevol = expm(phantom.met(m).HAB*time_ms*1i);
-            inv_Hevol = expm(phantom.met(m).HAB*time_ms*-1i);
+            Hevol = expm(phantom.met(m).HAB*time*1i);
+            inv_Hevol = expm(phantom.met(m).HAB*time*-1i);
 
             spins = calculate(spins, Hevol, inv_Hevol);
 
@@ -43,8 +43,8 @@ function [phantom] = MRSI_evolve(phantom, time_ms, MemoryOptions, ArgumentOption
         end
         %MATRIX PASSED INTO STRUCTURE VARIABLE
     elseif(strcmp(ArgumentOptions.argument_type, 'matrix'))
-        Hevol = expm(ArgumentOptions.HAB*time_ms*1i);
-        inv_Hevol = expm(ArgumentOptions.HAB*time_ms*-1i);
+        Hevol = expm(ArgumentOptions.HAB*time*1i);
+        inv_Hevol = expm(ArgumentOptions.HAB*time*-1i);
         phantom = calculate(phantom, Hevol, inv_Hevol);
     end
 
