@@ -20,8 +20,8 @@ function [out, spin_animation] = MRSI_simulate_gpu(traj, phantom, scanParameters
     arguments
         traj (1,1) Trajectory
         phantom (:, :) struct
-        scanParameters.gMax (1,1) double = 30
-        scanParameters.B0 (1,1) double = 3
+        scanParameters.gMax (1, 1) double = 30
+        scanParameters.B0 (1, 1) double = 3
         scanParameters.B0_map (:, :) double = zeros(length(phantom.y), length(phantom.x));
         MemoryOptions.use_disc (1,1) logical = 0;
         Debug.plot_spins (1, 1) logical = 0;

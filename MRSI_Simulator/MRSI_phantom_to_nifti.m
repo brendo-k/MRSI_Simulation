@@ -1,4 +1,9 @@
 function V = MRSI_phantom_to_nifti(phantom, filename, met)
+    arguments
+        phantom (1, 1) struct
+        filename (1, :) char
+        met (1, :) char 
+    end
     if(~contains(phantom.met_names, met, 'IgnoreCase',true))
         error('input metabolite name does not exist in the phantom structure')
     end

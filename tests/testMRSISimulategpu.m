@@ -121,4 +121,10 @@ classdef (SharedTestFixtures = { ...
         end
 
     end
+
+    methods
+        function phantom = buildPhantom(phantomSize, phantomResolution, metabolites, B0)
+            
+        end
+    end
 end
