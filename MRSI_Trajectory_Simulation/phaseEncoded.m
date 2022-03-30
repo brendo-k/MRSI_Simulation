@@ -50,6 +50,6 @@ end
     %add plus one because the zeroth point is counted
     traj = repmat(traj, [1, spectralSize]);
     
-    obj = Trajectory('cartesian', traj, imageSize, spectralSize, Fov, spectrallDwellTime, spectralWidth, t, 0.5);
+    obj = Trajectory('cartesian', traj, imageSize, spectralSize, Fov, spectrallDwellTime, spectralWidth, t, 1);
 end
     
