@@ -187,10 +187,10 @@ function [whiteMatterIntensity, greyMatterIntensity, protonDensity, ...
     else
         error('unknown resolution');
     end
-    wm = spm_vol([filePath, resolutionPath, 'wmMNI152_T1_2mm_brain.nii']);
-    gm = spm_vol([filePath, resolutionPath, 'gmMNI152_T1_2mm_brain.nii']);
-    pd = spm_vol([filePath, resolutionPath, 'pdMNI152_T1_2mm_brain.nii']);
-    skull = spm_vol([filePath, resolutionPath, 'MNI152_T1_2mm_skull.nii']);
+    wm = spm_vol([filePath, resolutionPath, 'wmMNI152_T1_', resolution, '_brain.nii']);
+    gm = spm_vol([filePath, resolutionPath, 'gmMNI152_T1_', resolution, '_brain.nii']);
+    pd = spm_vol([filePath, resolutionPath, 'pdMNI152_T1_', resolution, '_brain.nii']);
+    skull = spm_vol([filePath, resolutionPath, 'MNI152_T1_', resolution, '_skull.nii']);
     
     % First dimension: sagital plane (x), second dimension: coronal plane (y)
     % third dimension: transverse plane (z)

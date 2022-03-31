@@ -16,7 +16,8 @@ function [phantom] = MRSI_excite(phantom, deg, direction, MemoryOptions, Argumen
         deg (1,1) double
         direction (:,1) char
         MemoryOptions.use_disc (1,1) logical = 0
-        ArgumentOptions.argument_type {mustBeMember(ArgumentOptions.argument_type,{'struct', 'matrix'})} = "struct"
+        ArgumentOptions.argument_type {mustBeMember( ...
+            ArgumentOptions.argument_type, {'struct', 'matrix'})} = "struct"
         ArgumentOptions.F (:,:) double
     end
     if(strcmp(ArgumentOptions.argument_type, 'struct'))
